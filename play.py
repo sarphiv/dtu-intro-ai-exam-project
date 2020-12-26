@@ -5,15 +5,6 @@ from environment.agent import Agent
 from environment.simulator import Simulator
 
 
-def rot_center(image, angle, x, y):
-    
-    rotated_image = pygame.transform.rotate(image, angle)
-    new_rect = rotated_image.get_rect(center = image.get_rect(center = (x, y)).center)
-
-    return rotated_image, new_rect
-
-
-
 running = True
 
 forward_down = False
@@ -81,12 +72,9 @@ window = pygame.display.set_mode(window_size)
 
 clock = pygame.time.Clock()
 
-agent_img = pygame.image.load("assets/agent.png")
 agent = Agent(np.array([400, 400]),
-              math.pi / 2,
-              np.array([50, 50]))
-
-bullet_img = pygame.image.load("assets/bullet.png")
+              0,
+              np.array([50, 30]))
 
 (w, h) = window_size
 edge_depth = 100
@@ -99,7 +87,6 @@ sim = Simulator([agent], [keyboard_controller], [edge_right, edge_left, edge_top
 
 while running:
     time_delta = clock.tick()
-        
 
     window.fill((255, 255, 255))
     
@@ -108,12 +95,17 @@ while running:
     if len(losers):
         print("lost")
     
-    
-    agent_img_rot = rot_center(agent_img, agent.direction * 360 / (2*math.pi) - 90, *agent.position)
-    window.blit(*agent_img_rot)
+
+    agent_rect = agent.get_rect()
+    pygame.draw.polygon(window, (0, 0, 0), agent_rect)
+    pygame.draw.circle(window, (255, 0, 0), (round(agent_rect[0][0]), round(agent_rect[0][1])), 5)
+    d = agent.get_screen_direction()
+    pos = agent.position + d * (agent.size[0] / 2 + agent.bullet_width * 3 / 2)
+    pygame.draw.circle(window, (255, 0, 255), (round(pos[0]), round(pos[1])), agent.bullet_width)
+
 
     for bullet in sim.bullets:
-        window.blit(bullet_img, tuple(bullet.position.astype(np.int)))
+        pygame.draw.circle(window, (255, 0, 0), tuple(bullet.position.astype(np.int)), bullet.width)
 
     
     pygame.display.update()

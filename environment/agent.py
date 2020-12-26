@@ -73,17 +73,20 @@ class Agent(object):
         return np.array([ np.cos(self.direction), 
                          -np.sin(self.direction)])
     
+    def get_screen_rotation(self):
+        return np.array([[ np.cos(self.direction), np.sin(self.direction)],
+                         [-np.sin(self.direction), np.cos(self.direction)]])
+    
     def get_rect(self):
         (w, h) = self.size
 
-        d = np.diag(self.get_screen_direction())
-        relative_corners = np.matmul(d, np.array([[-w, w], [-h, h]]) / 2)
+        r = self.get_screen_rotation()
+        relative_corners = np.matmul(r, np.array([[-w, -w, w,  w], 
+                                                  [-h,  h, h, -h]]) / 2)
 
-        absolute_corners = relative_corners + np.tile(self.position, (2, 1)).T
+        absolute_corners = relative_corners + np.tile(self.position, (4, 1)).T
 
-        (x1, x2, y1, y2) = absolute_corners.flatten()
-
-        return [(x1, y1), (x2, y1), (x2, y2), (x1, y2)]
+        return [(x, y) for x, y in zip(*absolute_corners)]
 
 
     def turn(self, counter_clockwise, time_delta):
@@ -130,7 +133,7 @@ class Agent(object):
         self.velocity -= d * self.recoil
 
         #Spawn bullet at front of agent half a radius from tip
-        b_pos = self.position + d * self.size / 2 + self.bullet_width / 2 + self.size / 8 * d
+        b_pos = self.position + d * (self.size[0] / 2 + self.bullet_width * 3 / 2)
         #Fire bullet forwards and inherit agent velocity
         b_vel = d * self.bullet_speed + self.velocity
 
