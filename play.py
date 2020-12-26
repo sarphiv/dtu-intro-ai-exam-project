@@ -1,111 +1,137 @@
+from ai.spinbot import create_spinbot_controller
 import math
-import pygame
+import pygame as pg
 import numpy as np
+from time import sleep
+
 from environment.agent import Agent
 from environment.simulator import Simulator
+from environment.map import create_empty_map, create_middle_obstacle
+from game.keyboard_controller import create_keyboard_controller, wasd_control_scheme, uhjk_control_scheme
+from game.drawers import draw_bullet, draw_agent, draw_kill_box
 
 
-running = True
-
-forward_down = False
-backward_down = False
-left_down = False
-right_down = False
-space_down = False
-
-def keyboard_controller(simulator, time_delta):
-    global running
-    
-    global forward_down
-    global backward_down
-    global left_down
-    global right_down
-    global space_down
-
-    
-    for e in pygame.event.get():
-        if e.type == pygame.QUIT:
-            running = False
-        if e.type == pygame.KEYDOWN:
-            if e.key == pygame.K_w:
-                forward_down = True
-            elif e.key == pygame.K_s:
-                backward_down = True
-            elif e.key == pygame.K_a:
-                left_down = True
-            elif e.key == pygame.K_d:
-                right_down = True
-            elif e.key == pygame.K_SPACE:
-                space_down = True
-        elif e.type == pygame.KEYUP:
-            if e.key == pygame.K_w:
-                forward_down = False
-            elif e.key == pygame.K_s:
-                backward_down = False
-            elif e.key == pygame.K_a:
-                left_down = False
-            elif e.key == pygame.K_d:
-                right_down = False
-            elif e.key == pygame.K_SPACE:
-                space_down = False
-
-    
-    if forward_down:
-        agent.move(True, time_delta)
-    elif backward_down:
-        agent.move(False, time_delta)
-    
-    if left_down:
-        agent.turn(True, time_delta)
-    elif right_down:
-        agent.turn(False, time_delta)
-        
-    if space_down:
-        bullet = simulator.agents[0].shoot()
-        if bullet is not None:
-            simulator.bullets.append(bullet)
-
+#Define distances
 window_size = (1600, 900)
+agent_start_edge_distance = 200
+agent_size = np.array([50, 20])
 
-pygame.init()
-window = pygame.display.set_mode(window_size)
+#Initialize pygame
+pg.init()
+window = pg.display.set_mode(window_size)
+clock = pg.time.Clock()
+font = pg.font.SysFont(None, 48)
 
-clock = pygame.time.Clock()
+pg_events = None
 
-agent = Agent(np.array([400, 400]),
-              0,
-              np.array([50, 30]))
 
-(w, h) = window_size
-edge_depth = 100
-edge_right = [(0, 0), (-edge_depth, 0), (-edge_depth, h), (0, h)]
-edge_left = [(w, 0), (w+edge_depth, 0), (w+edge_depth, h), (w, h)]
-edge_top = [(0, 0), (0, -edge_depth), (w, -edge_depth), (w, 0)]
-edge_bottom = [(0, h), (0, h+edge_depth), (w, h+edge_depth), (w, h)]
+#Define simulation parameters
+agent_colors = [
+    (0, 127, 255),
+    (255, 127, 0)
+]
 
-sim = Simulator([agent], [keyboard_controller], [edge_right, edge_left, edge_top, edge_bottom])
+controllers = [
+    create_keyboard_controller(lambda: pg_events, wasd_control_scheme),
 
+    ##############################################################################################
+    #Choose opponent
+    # 1. Keyboard controlled agent
+    # 2. Spinning AI agent
+    ##############################################################################################
+    #create_keyboard_controller(lambda: pg_events, uhjk_control_scheme)
+    create_spinbot_controller()
+]
+
+map = create_empty_map(*window_size)
+wall = create_middle_obstacle(*window_size)
+
+
+#Helper function to create agents at specific positions and orientations
+def create_agents():
+    return [
+        Agent(np.array([agent_start_edge_distance, window_size[1] / 2]),
+            math.pi * 0,
+            agent_size),
+        Agent(np.array([window_size[0] - agent_start_edge_distance, window_size[1] / 2]),
+            math.pi * 1,
+            agent_size)
+    ]
+
+#Helper function to create simulation with required parameters
+def create_simulation(agents):
+    return Simulator(agents, controllers, [*map, wall])
+
+
+#Create agents and simulation
+agents = create_agents()
+sim = create_simulation(agents)
+
+
+#Game specific state
+running = True
+winner_found = False
+
+#Game loop
 while running:
+    if winner_found:
+        #Reset simulation
+        agents = create_agents()
+        sim = create_simulation(agents)
+        
+        winner_found = False
+
+        #Pause game
+        #NOTE: Disgusting, I know, performance is not important here
+        sleep(3)
+
+        #Reset the clock
+        clock = pg.time.Clock()
+
+
+    #Get time and events
     time_delta = clock.tick()
+    pg_events = pg.event.get()
 
-    window.fill((255, 255, 255))
-    
+    #Handle events
+    for e in pg_events:
+        if e.type == pg.QUIT:
+            running = False
+
+
+    #Simulate time step
     losers = sim.update(time_delta)
-    
-    if len(losers):
-        print("lost")
-    
-
-    agent_rect = agent.get_rect()
-    pygame.draw.polygon(window, (0, 0, 0), agent_rect)
-    pygame.draw.circle(window, (255, 0, 0), (round(agent_rect[0][0]), round(agent_rect[0][1])), 5)
-    d = agent.get_screen_direction()
-    pos = agent.position + d * (agent.size[0] / 2 + agent.bullet_width * 3 / 2)
-    pygame.draw.circle(window, (255, 0, 255), (round(pos[0]), round(pos[1])), agent.bullet_width)
 
 
+    #Draw background
+    window.fill((255, 255, 255))
+
+
+    #Draw agents
+    for agent, color in zip(agents, agent_colors):
+        draw_agent(window, agent, color)
+
+    #Draw bullets
     for bullet in sim.bullets:
-        pygame.draw.circle(window, (255, 0, 0), tuple(bullet.position.astype(np.int)), bullet.width)
+        draw_bullet(window, bullet)
 
-    
-    pygame.display.update()
+    #Draw kill boxes
+    for box in sim.kill_boxes:
+        draw_kill_box(window, box)
+
+
+    #Draw win text
+    if len(losers):
+        winner_found = True
+        
+        #NOTE: Biased towards player 1 losing
+        winner = 1 if losers[0] == 0 else 0
+        win_text = font.render(f"Player {winner+1} won!", True, agent_colors[winner])
+        
+        (w, h) = window_size
+        #Draw win text horizontally centered
+        window.blit(win_text, ((w-win_text.get_rect().width)//2, h//10))
+
+
+    #Update window
+    pg.display.update()
