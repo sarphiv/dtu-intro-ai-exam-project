@@ -4,10 +4,18 @@ import numpy as np
 
 
 def draw_bullet(surface, bullet):
+    tracer_factor = 16
+    pos = tuple(bullet.position.astype(np.int))
+    tracer_end = tuple((bullet.position - bullet.velocity * tracer_factor).astype(np.int))
+
+    #Draw tracer
+    pg.draw.aaline(surface, (255, 160, 160), pos, tracer_end)
+    
+    #Draw bullet
     pg.draw.circle(surface, 
-                    (255, 0, 127), 
-                    tuple(bullet.position.astype(np.int)), 
-                    bullet.width)
+                   (255, 0, 127), 
+                   pos, 
+                   bullet.width)
 
 
 def draw_agent(surface, agent, color):
@@ -24,7 +32,7 @@ def draw_agent(surface, agent, color):
         cooldown_color = (255, 0, 0)
     else:
         cooldown_percent = agent.cooldown_counter / agent.cooldown_heat_max
-        cooldown_color = (min(round(255 * cooldown_percent), 255), 0, min(round(255 * cooldown_percent), 255))
+        cooldown_color = (min(max(round(255 * cooldown_percent), 0), 255), 0, min(max(round(255 * cooldown_percent), 0), 255))
         
     cooldown_front_rect = agent.get_rect(cooldown_percent * cool_width_scale, cool_height_scale)
     cooldown_back_rect = agent.get_rect(cool_width_scale, cool_height_scale)

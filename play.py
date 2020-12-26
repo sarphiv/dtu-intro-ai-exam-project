@@ -107,17 +107,18 @@ while running:
     window.fill((255, 255, 255))
 
 
-    #Draw agents
-    for agent, color in zip(agents, agent_colors):
-        draw_agent(window, agent, color)
+    #Draw kill boxes
+    for box in sim.kill_boxes:
+        draw_kill_box(window, box)
 
     #Draw bullets
     for bullet in sim.bullets:
         draw_bullet(window, bullet)
 
-    #Draw kill boxes
-    for box in sim.kill_boxes:
-        draw_kill_box(window, box)
+    #Draw agents
+    for agent, color in zip(agents, agent_colors):
+        draw_agent(window, agent, color)
+
 
 
     #Draw win text
