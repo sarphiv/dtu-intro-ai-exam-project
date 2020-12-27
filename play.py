@@ -1,4 +1,5 @@
 from ai.spinbot import create_spinbot_controller
+from ai.seeker import create_seeker_controller
 import math
 import pygame as pg
 import numpy as np
@@ -37,10 +38,10 @@ controllers = [
     ##############################################################################################
     #Choose opponent
     # 1. Keyboard controlled agent
-    # 2. Spinning AI agent
+    # 2. Seeker AI agent
     ##############################################################################################
     #create_keyboard_controller(lambda: pg_events, uhjk_control_scheme)
-    create_spinbot_controller()
+    create_seeker_controller()
 ]
 
 map = create_empty_map(*window_size)
