@@ -121,7 +121,7 @@ while running:
 
 
 
-    #Draw win text
+    #If winner detected, draw win text
     if len(losers):
         winner_found = True
         

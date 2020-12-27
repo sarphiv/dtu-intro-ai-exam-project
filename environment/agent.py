@@ -1,5 +1,7 @@
 import math
 import numpy as np
+from numpy import linalg
+from numpy.core.numeric import array_equal
 
 from environment.bullet import Bullet
 
@@ -13,38 +15,42 @@ class Agent(object):
                  position, 
                  direction, 
                  size,
-                 move_speed=0.002,
+                 move_acceleration=0.0024,
                  turn_speed = 0.005,
                  velocity = np.zeros(2),
-                 smoothness = 0.997,
+                 velocity_resistance = 0.003,
+                 instability = 0,
                  recoil = 0.05,
-                 burst_cooldown = 70,
+                 burst_cooldown_time = 70,
+                 burst_cooldown_counter = 0,
                  cooldown_heat = 200,
                  cooldown_heat_max = 2000,
                  cooldown_time = 1200,
-                 instability = 0,
+                 cooldown_counter = 0,
                  bullet_speed = 3,
-                 bullet_width = 3,
-                 bullet_damage = 0.08):
+                 bullet_width = 2,
+                 bullet_damage = 0.1):
         super().__init__()
 
         self.position = position
         self.direction = direction
         self.size = size
-        
-        self.move_speed = move_speed
+
+        self.move_acceleration = move_acceleration
         self.turn_speed = turn_speed
-        self.velocity = velocity
-        self.smoothness = smoothness
+        self.velocity = velocity.copy()
+        self.velocity_resistance = velocity_resistance
+
+        self.instability = instability
         self.recoil = recoil
-        self.burst_cooldown = burst_cooldown
-        self.burst_counter = 0
+
+        self.burst_cooldown_time = burst_cooldown_time
+        self.burst_cooldown_counter = burst_cooldown_counter
         self.cooldown_heat = cooldown_heat
         self.cooldown_heat_max = cooldown_heat_max
         self.cooldown_time = cooldown_time
         self.cooldown_active = False
-        self.cooldown_counter = 0
-        self.instability = instability
+        self.cooldown_counter = cooldown_counter
         
         self.bullet_speed = bullet_speed
         self.bullet_width = bullet_width
@@ -52,17 +58,37 @@ class Agent(object):
 
 
     def update(self, time_delta):
-        #Shorthand variable for smoothness/slipperyness of movement
-        s = self.smoothness
+        #Shorthand variable for resistance of movement
+        t = time_delta
+        r = self.velocity_resistance
+        v = self.velocity
+        p = self.position
+
+        #Expression for velocity
+        # dv/dt = -v*r
         
-        #Update position based on velocity
-        #p = p + v + v*s + v*s*s + v*s*s*s ... v*s**(td-1)
-        #p = p + v*(1 + s + s*s + s*s*s ... s**(td-1))
-        #p = p + v*(1 + (s^td - s) / (s - 1))
-        self.position = self.position + self.velocity * (1 + (s**(time_delta)-s)/(s-1))
+        # dv/dt + v*r = 0
+        # v = c*e**(-r*t)
         
-        #Update velocity
-        self.velocity = self.velocity * s**time_delta
+        # v(0) = c_v = v_s
+        
+        # v = v_s*e**(-r*t)
+
+        #Expression for position
+        # dp/dt = v
+
+        # p = v/-r + c = v_s*e**(-r*t) / -r + c
+
+        # p(0) = v_s/-r + c_p
+        # p(0) + v_s/r = c_p = p_s + v_s/r
+
+        # p = v_s*e**(-r*t) / -r + c_p
+
+        c_v = v
+        c_p = c_v/r + p
+
+        self.velocity = c_v*math.exp(-r*t)
+        self.position = c_v*math.exp(-r*t) / -r + c_p
 
 
         #Reduce cooldown counters
@@ -71,8 +97,8 @@ class Agent(object):
             if self.cooldown_active and self.cooldown_counter <= 0:
                 self.cooldown_active = False
 
-        if self.burst_counter > 0:
-            self.burst_counter -= time_delta
+        if self.burst_cooldown_counter > 0:
+            self.burst_cooldown_counter -= time_delta
 
 
     def get_screen_direction(self):
@@ -121,13 +147,14 @@ class Agent(object):
     def move(self, forward, time_delta):
         #Create direction vector
         d = self.get_screen_direction()
-        
         #If moving backwards, reverse direction
         if not forward:
             d = -d
+        #Calculate acceleration vector
+        a = d * self.move_acceleration
 
         #Update velocity
-        self.velocity = self.velocity + d * self.move_speed * time_delta
+        self.velocity += a * time_delta
 
 
     def shoot(self):
@@ -135,7 +162,7 @@ class Agent(object):
         if self.cooldown_active:
             return None
         #Else if gun on burst cooldown, do not shoot
-        elif self.burst_counter > 0:
+        elif self.burst_cooldown_counter > 0:
             return None
         #Else handle gun cooldown
         else:
@@ -144,7 +171,7 @@ class Agent(object):
                 self.cooldown_active = True
                 self.cooldown_counter = self.cooldown_time
 
-            self.burst_counter = self.burst_cooldown
+            self.burst_cooldown_counter = self.burst_cooldown_time
         
         #Create direction vector
         d = self.get_screen_direction()
