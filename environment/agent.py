@@ -27,7 +27,7 @@ class Agent(object):
                  cooldown_heat_max = 2000,
                  cooldown_time = 1200,
                  cooldown_counter = 0,
-                 bullet_speed = 3,
+                 bullet_speed = 2,
                  bullet_width = 2,
                  bullet_damage = 0.1):
         super().__init__()
