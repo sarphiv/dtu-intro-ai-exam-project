@@ -12,13 +12,14 @@ class Agent(object):
     
     def __init__(self, 
                  position, 
-                 direction, 
+                 bearing, 
                  size,
                  move_acceleration=0.0024,
                  turn_speed = 0.004,
                  velocity = np.zeros(2),
                  velocity_resistance = 0.003,
                  instability = 0,
+                 armor = 1,
                  recoil = 0.05,
                  burst_cooldown_time = 70,
                  burst_cooldown_counter = 0,
@@ -32,7 +33,7 @@ class Agent(object):
         super().__init__()
 
         self.position = position
-        self.direction = direction
+        self.bearing = bearing
         self.size = size
 
         self.move_acceleration = move_acceleration
@@ -41,6 +42,7 @@ class Agent(object):
         self.velocity_resistance = velocity_resistance
 
         self.instability = instability
+        self.armor = armor
         self.recoil = recoil
 
         self.burst_cooldown_time = burst_cooldown_time
@@ -104,16 +106,16 @@ class Agent(object):
             self.burst_cooldown_counter -= time_delta
 
 
-    def get_screen_direction(self):
+    def get_screen_direction(self, offset=0.0):
         #Get unit direction vector relative to screen coordinates
         #NOTE: Negate y-axis because y-axis is reversed
-        return np.array([ np.cos(self.direction), 
-                         -np.sin(self.direction)])
+        return np.array([ np.cos(self.bearing + offset), 
+                         -np.sin(self.bearing + offset)])
     
     def get_screen_rotation(self):
         #Get ortonormal matrix to rotate relative to screen coordinates
-        return np.array([[ np.cos(self.direction), np.sin(self.direction)],
-                         [-np.sin(self.direction), np.cos(self.direction)]])
+        return np.array([[ np.cos(self.bearing), np.sin(self.bearing)],
+                         [-np.sin(self.bearing), np.cos(self.bearing)]])
     
     def get_rect(self, scale_width = 1, scale_height = 1):
         """
@@ -138,13 +140,13 @@ class Agent(object):
     def turn(self, counter_clockwise, time_delta):
         #If turning counter-clockwise, change direction with turn speed
         if counter_clockwise:
-            self.direction += self.turn_speed * time_delta
+            self.bearing += self.turn_speed * time_delta
         #Else, turn clockwise
         else:
-            self.direction -= self.turn_speed * time_delta
+            self.bearing -= self.turn_speed * time_delta
         
         #Normalize direction to be [0, 2pi[
-        self.direction = self.direction % (math.pi * 2)
+        self.bearing = self.bearing % (math.pi * 2)
 
 
     def move(self, forward, time_delta):
@@ -192,7 +194,7 @@ class Agent(object):
     
     def impact(self, bullet):
         #Receive damage
-        self.instability += bullet.damage
+        self.instability += bullet.damage / self.armor
         #Update velocity with bullet velocity multiplied by health
         self.velocity += bullet.velocity * self.instability
 

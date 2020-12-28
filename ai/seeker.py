@@ -17,7 +17,7 @@ def create_seeker_controller():
         enemy_bearing = (math.acos(x / h)) * (-1 if (y >= 0) else 1) % (2*math.pi)
 
         #Calculate direction change needed
-        direction_change = (enemy_bearing - agent.direction) % (2*math.pi)
+        direction_change = (enemy_bearing - agent.bearing) % (2*math.pi)
 
         #Decide on actions
         left = direction_change > math.pi

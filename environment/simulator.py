@@ -5,28 +5,35 @@ class Simulator(object):
     Runs a simulation of a game
     """
 
-    def __init__(self, agents, controllers, kill_boxes):
+    def __init__(self, agents, controllers, kill_zones):
         super().__init__()
         
         self.agents = agents
         self.controllers = controllers
-        self.kill_boxes = kill_boxes
+        self.kill_zones = kill_zones
         self.bullets = []
+        self.dead_agents = {}
+
+
+    @property
+    def alive_agents(self):
+        return {agent_index: agent for agent_index, agent in enumerate(self.agents) if agent_index not in self.dead_agents}
 
 
     def run_controllers(self, time_delta):
         #Save actions
         actions = []
         
-        #Iterate through all controllers and save actions
+        #Iterate through all alive agents' controllers and save actions
         #NOTE: Not executing actions right away
         # as agents whose controllers are ran later,
         # would get information about earlier agents' future actions.
         for agent_id, controller in enumerate(self.controllers):
-            actions.append(controller(self, agent_id, time_delta))
+            if agent_id not in self.dead_agents:
+                actions.append((agent_id, controller(self, agent_id, time_delta)))
 
-        #Iterate through all actions and execute them
-        for agent_id, action in enumerate(actions):
+        #Iterate through all alive agents' actions and execute them
+        for agent_id, action in actions:
             #Destructure actions
             (forward, backward, left, right, shoot) = action
             
@@ -59,7 +66,7 @@ class Simulator(object):
             bullet_rect = Polygon(bullet.get_rect())
 
             #If bullet has hit a kill box, mark collided
-            for box in self.kill_boxes:
+            for box in self.kill_zones:
                 box_rect = Polygon(box)
                 if bullet_rect.intersects(box_rect):
                     collided = True
@@ -81,7 +88,7 @@ class Simulator(object):
 
 
     def update_agents(self, time_delta):
-        for agent in self.agents:
+        for agent in self.alive_agents.values():
             agent.update(time_delta)
 
     def update_bullets(self, time_delta):
@@ -89,22 +96,23 @@ class Simulator(object):
             bullet.update(time_delta)
 
 
-    def find_losers(self):
-        #Track losers
-        losers = []
+    def update_agent_kill_zones(self):
+        #Track dead agents
+        dead_agents = []
 
-        #If an agent is touching a kill box, mark agent ID as losing
+        #If an agent is touching a kill zone, mark agent ID as dead
         for i, agent in enumerate(self.agents):
             agent_rect = Polygon(agent.get_rect())
 
-            for box in self.kill_boxes:
+            for box in self.kill_zones:
                 box_rect = Polygon(box)
                 if agent_rect.intersects(box_rect):
-                    losers.append(i)
+                    dead_agents.append(i)
+                    self.dead_agents[i] = agent
                     break
 
-        #Return all agents that have lost
-        return losers
+        #Return all agents that have 
+        return dead_agents
 
 
     def update(self, time_delta):
@@ -116,6 +124,9 @@ class Simulator(object):
         #Update agents and non-collided bullets
         self.update_agents(time_delta)
         self.update_bullets(time_delta)
+        
+        #Update dead agents
+        self.update_agent_kill_zones()
 
-        #Return losers
-        return self.find_losers()
+        #Return dead agents
+        return [agent_index for agent_index in self.dead_agents.keys()]
