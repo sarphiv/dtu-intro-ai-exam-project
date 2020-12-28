@@ -16,7 +16,7 @@ class Agent(object):
                  direction, 
                  size,
                  move_acceleration=0.0024,
-                 turn_speed = 0.005,
+                 turn_speed = 0.004,
                  velocity = np.zeros(2),
                  velocity_resistance = 0.003,
                  instability = 0,

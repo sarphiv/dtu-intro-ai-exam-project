@@ -15,11 +15,20 @@ class Simulator(object):
 
 
     def run_controllers(self, time_delta):
-        #Iterate through all controllers
+        #Save actions
+        actions = []
+        
+        #Iterate through all controllers and save actions
+        #NOTE: Not executing actions right away
+        # as agents whose controllers are ran later,
+        # would get information about earlier agents' future actions.
         for agent_id, controller in enumerate(self.controllers):
-            #Get actions from controller
-            (forward, backward, left, right, shoot) = controller(self, agent_id, time_delta)
+            actions.append(controller(self, agent_id, time_delta))
 
+        #Iterate through all actions and execute them
+        for agent_id, action in enumerate(actions):
+            #Destructure actions
+            (forward, backward, left, right, shoot) = action
             
             #Get associated agent
             agent = self.agents[agent_id]
