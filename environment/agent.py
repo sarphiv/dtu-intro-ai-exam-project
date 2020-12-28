@@ -19,7 +19,7 @@ class Agent(object):
                  velocity = np.zeros(2),
                  velocity_resistance = 0.003,
                  instability = 0,
-                 armor = 1,
+                 armor = 20,
                  recoil = 0.05,
                  burst_cooldown_time = 70,
                  burst_cooldown_counter = 0,
