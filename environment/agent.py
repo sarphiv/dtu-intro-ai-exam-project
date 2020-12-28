@@ -1,7 +1,6 @@
 import math
 import numpy as np
-from numpy import linalg
-from numpy.core.numeric import array_equal
+import copy
 
 from environment.bullet import Bullet
 
@@ -55,6 +54,10 @@ class Agent(object):
         self.bullet_speed = bullet_speed
         self.bullet_width = bullet_width
         self.bullet_damage = bullet_damage
+
+
+    def deep_copy(self):
+        return copy.deepcopy(self)
 
 
     def update(self, time_delta):
