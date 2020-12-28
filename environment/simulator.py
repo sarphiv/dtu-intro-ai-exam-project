@@ -72,7 +72,7 @@ class Simulator(object):
                     collided = True
 
             #If bullet has hit an agent, impact agent and mark collided
-            for agent in self.agents:
+            for agent in self.alive_agents.values():
                 agent_rect = Polygon(agent.get_rect())
                 if agent_rect.intersects(bullet_rect):
                     agent.impact(bullet)

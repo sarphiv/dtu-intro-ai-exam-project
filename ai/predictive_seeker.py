@@ -1,3 +1,4 @@
+from environment.enemy_chooser import create_enemy_chooser
 from ai.idle import create_idle_controller
 import numpy as np
 import math
@@ -29,12 +30,7 @@ def create_predictive_seeker_controller(enemy_ids):
 
 
     #Initialize state variables for controller
-    #  If there are enemies, choose a random one
-    if len(enemy_ids):
-        enemy_id = r.choice(enemy_ids)
-    #  Else, set no enemies
-    else:
-        enemy_id = None
+    enemy_chooser = create_enemy_chooser(enemy_ids)
 
     #  Parameters for flanking enemy while gun is on cooldown
     #    Left or right biased flank
@@ -44,13 +40,12 @@ def create_predictive_seeker_controller(enemy_ids):
     #    Counter for how long a flank strategy has been active
     flank_counter = 0
 
-    #    Controller to activate if there are no enemies
+    #  Controller to activate if there are no enemies
     idle_controller = create_idle_controller()
 
 
     def controller(simulator, agent_id, time_delta):
         #Bring controller state into scope
-        nonlocal enemy_id
         nonlocal flank_counter
         nonlocal flank_side
         nonlocal flank_front
@@ -62,21 +57,10 @@ def create_predictive_seeker_controller(enemy_ids):
         #Get agent being controlled
         agent = simulator.agents[agent_id]
 
-
-        #Mark first alive enemy as target
-        if enemy_id is None or enemy_id in simulator.dead_agents:
-            enemy_id = None
-            enemy = None
-            for id in enemy_ids:
-                if id not in simulator.dead_agents:
-                    enemy_id = id
-                    enemy = simulator.agents[id]
-                    break
-        else:
-            enemy = simulator.agents[enemy_id]
-
+        #Choose enemy
+        enemy = enemy_chooser(simulator)
         #If there are no enemies, idle
-        if enemy_id is None:
+        if enemy is None:
             return idle_controller(simulator, agent_id, time_delta)
 
 
