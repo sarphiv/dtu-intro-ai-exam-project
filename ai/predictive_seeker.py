@@ -22,10 +22,9 @@ def create_predictive_seeker_controller(enemy_ids):
     flank_front_distance_scaler = 14
     flank_back_distance_scaler = 10
 
-    aggression = 24
-
-    collision_ray_middle_scaler = 3
-    collision_ray_side_scaler = 1
+    collision_raw_velocity_scaler = 16
+    collision_ray_middle_scaler = 4
+    collision_ray_side_scaler = 2
     collision_ray_side_angle = math.pi / 4
     collision_ray_back_relative_scaler = 1 / 2
 
@@ -62,7 +61,7 @@ def create_predictive_seeker_controller(enemy_ids):
         # Get normalized front ray
         ray_norm = agent.get_screen_direction()
         # Get scaler for rays, depending on velocity, agent size, and aggression
-        ray_scaler = np.linalg.norm(agent.velocity) * time_delta / agent.size[0] * r.randrange(1, aggression) + 1
+        ray_scaler = np.linalg.norm(agent.velocity) * time_delta / agent.size[0] * collision_raw_velocity_scaler + 1
         # Create front rays
         rays_front = np.array([ray_norm * collision_ray_middle_scaler, 
                                np.matmul(ray_rotator, ray_norm) * collision_ray_side_scaler, 
@@ -155,6 +154,23 @@ def create_predictive_seeker_controller(enemy_ids):
         return enemy_flank_direction + enemy.position + enemy_movement - agent.position
 
 
+    def bearing_change(agent: Agent, direction):
+        #Distance to position
+        distance = np.linalg.norm(direction)
+        (x, y) = direction
+        
+        #Calculate bearing from agent to position
+        #NOTE: y-axis has inverted screen coordinates
+        direction_bearing = (math.acos(x / distance)) * (-1 if (y >= 0) else 1) % (2*math.pi)
+
+        #Calculate bearing change needed
+        bearing_change = (direction_bearing - agent.bearing) % (2 * math.pi)
+        bearing_change += -2*math.pi if bearing_change > math.pi else 0
+
+        #Return change needed to face direction
+        return bearing_change
+
+
     def controller(simulator: Simulator, agent_id, time_delta):
         #Bring controller state into scope
         nonlocal flank_counter
@@ -176,50 +192,46 @@ def create_predictive_seeker_controller(enemy_ids):
         #Get status of gun
         gun_available_soon = agent.cooldown_counter / agent.cooldown_time < flank_cooldown_limit
         gun_available = not agent.cooldown_active or gun_available_soon
-
-        steer_to_shoot = gun_available or gun_available_soon
-
-
         #Check if target is obstructed
         target_blocked = detect_target_obstruction(simulator, agent, enemy)
         #Check collision alerts
         (collision_front_alert, collision_back_alert) = detect_collision_alert(simulator, agent, time_delta)
 
+
+        #Get strategy
+        steer_to_shoot = gun_available or gun_available_soon
         steer_to_position = target_blocked or collision_front_alert
+
+
+        #Calculate how to hit target
+        target_direction = aim_predictive_direction(agent, enemy)
+        target_bearing_change = bearing_change(agent, target_direction)
 
 
         #If clear shoot, aim ahead of enemy's movement
         if steer_to_shoot and not steer_to_position:
-            target_direction = aim_predictive_direction(agent, enemy)
+            move_bearing_change = target_bearing_change
         #Else gun unavailable, or target obstructed, move to flank enemy
         else:
-            target_direction = flank_direction(agent, enemy, time_delta)
-
-
-        #Calculate distance to target
-        target_distance = np.linalg.norm(target_direction)
-        (x, y) = target_direction
-
-        #Calculate bearing from agent to target
-        #NOTE: y-axis has inverted screen coordinates
-        enemy_bearing = (math.acos(x / target_distance)) * (-1 if (y >= 0) else 1) % (2*math.pi)
-
-        #Calculate bearing change needed
-        bearing_change = (enemy_bearing - agent.bearing) % (2 * math.pi)
-        bearing_change += -2*math.pi if bearing_change > math.pi else 0
+            move_direction = flank_direction(agent, enemy, time_delta)
+            move_bearing_change = bearing_change(agent, move_direction)
 
 
         #Turn to face target
-        left = bearing_change > 0
+        left = move_bearing_change > 0
         right = not left
 
         #Shoot if target within sights
-        shoot = not target_blocked and (abs(bearing_change) < shoot_accuracy_limit)
+        shoot = not target_blocked and (abs(target_bearing_change) < shoot_accuracy_limit)
+
         #Move forwards if shooting, flanking, or avoiding a back collision. Unless there is a collision in front
+        #NOTE: Still moves forwards while steering to shoot, as it steers to shoot before gun is available.
+        # This helps it avoid shots
         forward = (shoot or agent.cooldown_active or target_blocked or collision_back_alert) and not collision_front_alert
+
         #Move backwards if there is a collision in front
         #NOTE: There could be a collision both sides. Too bad.
-        backward = collision_front_alert
+        backward = collision_front_alert and not collision_back_alert
 
 
         #Return actions
