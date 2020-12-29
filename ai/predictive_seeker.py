@@ -1,3 +1,5 @@
+from environment.agent import Agent
+from environment.simulator import Simulator
 from environment.enemy_chooser import create_enemy_chooser
 from ai.idle import create_idle_controller
 import numpy as np
@@ -45,19 +47,14 @@ def create_predictive_seeker_controller(enemy_ids):
     idle_controller = create_idle_controller()
     
 
-    def detect_target_obstruction(simulator, agent, enemy, time_delta):
+    def detect_target_obstruction(simulator: Simulator, agent, enemy):
         target_line_of_sight = LineString([tuple(agent.position), tuple(enemy.position)])
-        for box in simulator.kill_zones:
-            box_shape = Polygon(box)
-            
-            if target_line_of_sight.intersects(box_shape):
-                return True
 
-        return False
+        return simulator.intersects_kill_zone(target_line_of_sight)
 
 
-    def detect_collision_alert(simulator, agent, time_delta):
-                #Set up collision rays
+    def detect_collision_alert(simulator: Simulator, agent: Agent, time_delta):
+        #Set up collision rays
         # Set up side ray rotation arrays
         ray_rotator = np.array([[np.cos(collision_ray_side_angle), -np.sin(collision_ray_side_angle)],
                                 [np.sin(collision_ray_side_angle),  np.cos(collision_ray_side_angle)]])
@@ -85,20 +82,16 @@ def create_predictive_seeker_controller(enemy_ids):
         #Detect collisions with rays
         collision_front_alert = False
         collision_back_alert = False
-        # Loop through all kill zones
-        for box in simulator.kill_zones:
-            box_shape = Polygon(box)
-            
-            # Loop through all ray lines
-            for i, ray_line in enumerate(ray_lines):
-                #If kill zone collides with ray line, activate collision alert
-                if ray_line.intersects(box_shape):
-                    # If front ray collided, activate front alert
-                    if i < len(ray_lines) // 2:
-                        collision_front_alert = True
-                    # Else, back ray collided, activate back alert
-                    else:
-                        collision_back_alert = True
+        # Loop through all ray lines
+        for i, ray_line in enumerate(ray_lines):
+            #If ray line intersects a kill zone, activate collision alert
+            if simulator.intersects_kill_zone(ray_line):
+                # If front ray collided, activate front alert
+                if i < len(ray_lines) // 2:
+                    collision_front_alert = True
+                # Else, back ray collided, activate back alert
+                else:
+                    collision_back_alert = True
 
             #If both alerts activated, break, no point in further checking
             if collision_front_alert and collision_back_alert:
@@ -162,7 +155,7 @@ def create_predictive_seeker_controller(enemy_ids):
         return enemy_flank_direction + enemy.position + enemy_movement - agent.position
 
 
-    def controller(simulator, agent_id, time_delta):
+    def controller(simulator: Simulator, agent_id, time_delta):
         #Bring controller state into scope
         nonlocal flank_counter
         
@@ -188,7 +181,7 @@ def create_predictive_seeker_controller(enemy_ids):
 
 
         #Check if target is obstructed
-        target_blocked = detect_target_obstruction(simulator, agent, enemy, time_delta)
+        target_blocked = detect_target_obstruction(simulator, agent, enemy)
         #Check collision alerts
         (collision_front_alert, collision_back_alert) = detect_collision_alert(simulator, agent, time_delta)
 

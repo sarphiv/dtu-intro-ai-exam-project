@@ -11,7 +11,7 @@ from environment.agent import Agent
 from environment.simulator import Simulator
 from environment.map import create_empty_map, create_middle_obstacle, create_spawns
 from game.keyboard_controller import create_keyboard_controller, wasd_control_scheme, uhjk_control_scheme
-from game.drawers import draw_bullet, draw_agent, draw_kill_box
+from game.drawers import draw_bullet, draw_agent, draw_kill_zone
 
 
 #Define distances
@@ -145,9 +145,9 @@ while running:
         #Draw background
         window.fill((255, 255, 255))
 
-        #Draw kill boxes
-        for box in sim.kill_zones:
-            draw_kill_box(window, box)
+        #Draw kill zones
+        for zone in sim.kill_zones:
+            draw_kill_zone(window, zone)
 
         #Draw bullets
         for bullet in sim.bullets:
