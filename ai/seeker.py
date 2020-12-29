@@ -1,4 +1,4 @@
-from enemy_chooser.random_sticky import create_random_sticky
+from enemy_chooser.first import create_first
 import numpy as np
 import math
 import random as r
@@ -6,7 +6,7 @@ from ai.idle import create_idle_controller
 
 def create_seeker_controller(enemy_ids):
     #Initialize state variables for controller
-    enemy_chooser = create_random_sticky(enemy_ids)
+    enemy_chooser = create_first(enemy_ids)
         
     #  Controller to activate if there are no enemies
     idle_controller = create_idle_controller()

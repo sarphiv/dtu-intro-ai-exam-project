@@ -1,5 +1,8 @@
 import random as r
 
+from environment.simulator import Simulator
+
+
 def create_random_sticky(enemy_ids):
     #If there are enemies, choose a random one
     if len(enemy_ids):
@@ -9,20 +12,24 @@ def create_random_sticky(enemy_ids):
         enemy_id = None
 
 
-    def chooser(simulator, agent_id, time_delta):
+    def chooser(simulator: Simulator, agent_id, time_delta):
         nonlocal enemy_id
         
-        #Mark first alive enemy as target, else None
+        #If no marked alive enemy, mark random alive enemy as target, else None
         if enemy_id is None or enemy_id in simulator.dead_agents:
-            enemy_id = None
-            for id in enemy_ids:
-                if id not in simulator.dead_agents:
-                    enemy_id = id
-                    return enemy_id
+            #Get all alive enemy IDs
+            alive_enemies = { id for id in enemy_ids if id not in simulator.dead_agents }
 
-            return None
-        else:
-            return enemy_id
+            #If there are enemies alive, mark a random one
+            if len(alive_enemies):
+                enemy_id = r.choice(list(alive_enemies))
+            #Else, mark no enemy
+            else:
+                enemy_id = None
+
+
+        #Return marked enemy, if none, return None
+        return enemy_id
 
 
     return chooser
