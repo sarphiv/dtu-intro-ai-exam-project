@@ -15,16 +15,6 @@ agent_size = np.array([50, 20])
 agent_spawns = create_spawns(*map_size, agent_start_edge_distance)
 
 
-##############################################################################################
-#INSERT DEFINITION OF AI CONTROLLER
-##############################################################################################
-controllers = [
-    create_predictive_seeker_controller(enemy_ids=range(2, 4)),
-    create_predictive_seeker_controller(enemy_ids=range(2, 4)),
-    create_predictive_seeker_controller(enemy_ids=range(0, 2)),
-    create_predictive_seeker_controller(enemy_ids=range(0, 2)),
-]
-
 map = create_empty_map(*map_size)
 wall = create_middle_obstacle(*map_size)
 
@@ -42,14 +32,27 @@ def create_agents():
                agent_size),
     ]
 
+#Helper function to create controllers for agents
+def create_controllers():
+    return [
+        ##############################################################################################
+        #INSERT DEFINITION OF AI CONTROLLER
+        ##############################################################################################
+        create_predictive_seeker_controller(enemy_ids=range(2, 4)),
+        create_predictive_seeker_controller(enemy_ids=range(2, 4)),
+        create_predictive_seeker_controller(enemy_ids=range(0, 2)),
+        create_predictive_seeker_controller(enemy_ids=range(0, 2)),
+    ]
+
 #Helper function to create simulation with required parameters
-def create_simulation(agents):
+def create_simulation(agents, controllers):
     return Simulator(agents, controllers, [*map, wall])
 
 
-#Create agents and simulation
+#Create agents, controllers, and simulation
 agents = create_agents()
-sim = create_simulation(agents)
+controllers = create_controllers()
+sim = create_simulation(agents, controllers)
 
 #NOTE: Uneven teams biases second team
 team_size = len(agents) // 2
@@ -69,8 +72,10 @@ while running:
 
         #Reset simulation
         winners = None
+        #Create agents, controllers, and simulation
         agents = create_agents()
-        sim = create_simulation(agents)
+        controllers = create_controllers()
+        sim = create_simulation(agents, controllers)
 
 
     #Simulate time step

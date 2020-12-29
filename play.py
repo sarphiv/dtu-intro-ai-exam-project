@@ -37,27 +37,6 @@ agent_colors = [
     (255, 127, 0),
 ]
 
-controllers = [
-    ##############################################################################################
-    #Choose controllers
-    # - Keyboard controlled agent
-    # - Idle AI agent
-    # - Spinbot AI agent
-    # - Seeker AI agent
-    # - Predictive seeker AI agent
-    ##############################################################################################
-
-    # create_keyboard_controller(lambda: pg_events, wasd_control_scheme),
-    # create_keyboard_controller(lambda: pg_events, uhjk_control_scheme)
-    # create_idle_controller(),
-    # create_spinbot_controller(),
-    # create_seeker_controller(),
-    create_predictive_seeker_controller(enemy_ids=range(2, 4)),
-    create_predictive_seeker_controller(enemy_ids=range(2, 4)),
-    create_predictive_seeker_controller(enemy_ids=range(0, 2)),
-    create_predictive_seeker_controller(enemy_ids=range(0, 2)),
-]
-
 map = create_empty_map(*map_size)
 wall = create_middle_obstacle(*map_size)
 
@@ -75,14 +54,38 @@ def create_agents():
               agent_size),
     ]
 
+#Helper function to create controllers for agents
+def create_controllers():
+    return [
+        ##############################################################################################
+        #Choose controllers
+        # - Keyboard controlled agent
+        # - Idle AI agent
+        # - Spinbot AI agent
+        # - Seeker AI agent
+        # - Predictive seeker AI agent
+        ##############################################################################################
+
+        # create_keyboard_controller(lambda: pg_events, wasd_control_scheme),
+        # create_keyboard_controller(lambda: pg_events, uhjk_control_scheme)
+        # create_idle_controller(),
+        # create_spinbot_controller(),
+        # create_seeker_controller(),
+        create_predictive_seeker_controller(enemy_ids=range(2, 4)),
+        create_predictive_seeker_controller(enemy_ids=range(2, 4)),
+        create_predictive_seeker_controller(enemy_ids=range(0, 2)),
+        create_predictive_seeker_controller(enemy_ids=range(0, 2)),
+    ]
+
 #Helper function to create simulation with required parameters
-def create_simulation(agents):
+def create_simulation(agents, controllers):
     return Simulator(agents, controllers, [*map, wall])
 
 
-#Create agents and simulation
+#Create agents, controllers, and simulation
 agents = create_agents()
-sim = create_simulation(agents)
+controllers = create_controllers()
+sim = create_simulation(agents, controllers)
 
 #NOTE: Uneven teams biases second team
 team_size = len(agents) // 2
@@ -109,8 +112,10 @@ while running:
 
         #Reset simulation
         winners = None
+        #Create agents, controllers, and simulation
         agents = create_agents()
-        sim = create_simulation(agents)
+        controllers = create_controllers()
+        sim = create_simulation(agents, controllers)
 
 
         #Pause game
