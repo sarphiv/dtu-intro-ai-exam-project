@@ -1,5 +1,5 @@
 import numpy as np
-import math
+import random as r
 
 from environment.map import create_empty_map, create_middle_obstacle, create_spawns
 from environment.agent import Agent
@@ -8,7 +8,7 @@ from ai.predictive_seeker import create_predictive_seeker_controller
 
 
 #Define distances
-time_step = 16 #milliseconds
+time_step_range = (6, 19) #milliseconds
 map_size = (1600, 900)
 agent_start_edge_distance = 200
 agent_size = np.array([50, 20])
@@ -57,24 +57,24 @@ team_size = len(agents) // 2
 
 #Game specific state
 running = True
-winner = None
+winners = None
 
 #Game loop
 while running:
-    if winner:
+    if winners is not None:
         ##############################################################################################
         #DO SOMETHING WHEN WINNER HAS BEEN FOUND
         ##############################################################################################
-
+        print(winners)
 
         #Reset simulation
-        winner = None
+        winners = None
         agents = create_agents()
         sim = create_simulation(agents)
 
 
     #Simulate time step
-    losers = sim.update(time_step)
+    losers = sim.update(r.randint(*time_step_range))
 
 
     #Get indexes of agents alive
