@@ -1,3 +1,5 @@
+from typing import List, Tuple
+from environment.agent import Agent
 from shapely.geometry import Polygon
 from shapely.geometry.base import BaseGeometry
 
@@ -6,7 +8,7 @@ class Simulator(object):
     Runs a simulation of a game
     """
 
-    def __init__(self, agents, controllers, kill_zones):
+    def __init__(self, agents: List[Agent], controllers, kill_zones: List[Tuple[float, float]]):
         super().__init__()
         
         self.agents = agents

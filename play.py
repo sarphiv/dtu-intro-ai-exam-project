@@ -71,8 +71,8 @@ def create_controllers():
         # create_idle_controller(),
         # create_spinbot_controller(),
         # create_seeker_controller(),
-        create_predictive_seeker_controller(enemy_ids=range(2, 4)),
-        create_predictive_seeker_controller(enemy_ids=range(2, 4)),
+        create_seeker_controller(enemy_ids=range(2, 4)),
+        create_seeker_controller(enemy_ids=range(2, 4)),
         create_predictive_seeker_controller(enemy_ids=range(0, 2)),
         create_predictive_seeker_controller(enemy_ids=range(0, 2)),
     ]
@@ -98,13 +98,18 @@ winners = None
 #Game loop
 while running:
     if winners is not None:
-        #Prepare win text
-        winner = winners[0]
-        win_text = font.render(f"Player {winner+1} won!", True, agent_colors[winner])
+        #Prepare end text
+        if len(winners) > 0:
+            player_text = f"Player{'s' if len(winners)>1 else ''}"
+            end_text = font.render(f"{player_text} {' and '.join([str(w+1) for w in winners])} won!", 
+                                   True, #Antialiasing
+                                   agent_colors[winners[0]]) #Color
+        else:
+            end_text = font.render(f"Draw!", True, (128, 128, 128))
 
-        #Draw win text horizontally centered at top of screen
+        #Draw end text horizontally centered at top of screen
         (w, h) = map_size
-        window.blit(win_text, ((w-win_text.get_rect().width)//2, h//10))
+        window.blit(end_text, ((w-end_text.get_rect().width)//2, h//10))
 
         #Render to window
         pg.display.update()

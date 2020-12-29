@@ -1,6 +1,6 @@
 from environment.agent import Agent
 from environment.simulator import Simulator
-from environment.enemy_chooser import create_enemy_chooser
+from enemy_chooser.nearest import create_nearest
 from ai.idle import create_idle_controller
 import numpy as np
 import math
@@ -10,7 +10,7 @@ from shapely.geometry import LineString, Polygon
 
 def create_predictive_seeker_controller(enemy_ids):
     #Initialize constants for controller
-    fudge_factor_base = 1.0004
+    fudge_factor_base = 1.0005
 
     flank_cooldown_limit = 0.60
     
@@ -28,11 +28,13 @@ def create_predictive_seeker_controller(enemy_ids):
     collision_ray_side_angle = math.pi / 4
     collision_ray_back_relative_scaler = 1 / 2
 
-    shoot_accuracy_limit = (math.pi / 128)
+    shoot_accuracy_limit = math.pi / 128
+    shoot_turn_accuracy_limit = math.pi / 256
 
 
     #Initialize state variables for controller
-    enemy_chooser = create_enemy_chooser(enemy_ids)
+    enemy_chooser = create_nearest(enemy_ids)
+    enemy_id = None
 
     #  Parameters for flanking enemy while gun is on cooldown
     #    Left or right biased flank
@@ -174,6 +176,7 @@ def create_predictive_seeker_controller(enemy_ids):
     def controller(simulator: Simulator, agent_id, time_delta):
         #Bring controller state into scope
         nonlocal flank_counter
+        nonlocal enemy_id
         
         #Update flank counter by decrementing if above 0
         flank_counter -= time_delta * (flank_counter > 0)
@@ -182,16 +185,24 @@ def create_predictive_seeker_controller(enemy_ids):
         #Get agent being controlled
         agent = simulator.agents[agent_id]
 
-        #Choose enemy
-        enemy = enemy_chooser(simulator)
+
+        #If there is no alive enemy targeted, attempt to choose one
+        if enemy_id is None or enemy_id in simulator.dead_agents:
+            enemy_id = enemy_chooser(simulator, agent_id, time_delta)
+
         #If there are no enemies, idle
-        if enemy is None: 
+        if enemy_id is None:
             return idle_controller(simulator, agent_id, time_delta)
+        #Else, mark enemy
+        else:
+            enemy = simulator.agents[enemy_id]
 
 
         #Get status of gun
         gun_available_soon = agent.cooldown_counter / agent.cooldown_time < flank_cooldown_limit
         gun_available = not agent.cooldown_active or gun_available_soon
+
+
         #Check if target is obstructed
         target_blocked = detect_target_obstruction(simulator, agent, enemy)
         #Check collision alerts
@@ -211,18 +222,27 @@ def create_predictive_seeker_controller(enemy_ids):
         #If clear shoot, aim ahead of enemy's movement
         if steer_to_shoot and not steer_to_position:
             move_bearing_change = target_bearing_change
-        #Else gun unavailable, or target obstructed, move to flank enemy
+        #Else gun unavailable, or target obstructed, move to flank new enemy
         else:
+            #Choose new enemy
+            enemy_id = enemy_chooser(simulator, agent_id, time_delta)
+            enemy = simulator.agents[enemy_id]
+            
+            #Get direction to new enemy
             move_direction = flank_direction(agent, enemy, time_delta)
             move_bearing_change = bearing_change(agent, move_direction)
 
 
-        #Turn to face target
-        left = move_bearing_change > 0
-        right = not left
-
         #Shoot if target within sights
         shoot = not target_blocked and (abs(target_bearing_change) < shoot_accuracy_limit)
+
+        #If on target, do not turn
+        if shoot and abs(target_bearing_change) < shoot_turn_accuracy_limit:
+            (left, right) = (False, False)
+        #Else, turn to face target/move direction
+        else:
+            left = move_bearing_change > 0
+            right = not left
 
         #Move forwards if shooting, flanking, or avoiding a back collision. Unless there is a collision in front
         #NOTE: Still moves forwards while steering to shoot, as it steers to shoot before gun is available.
