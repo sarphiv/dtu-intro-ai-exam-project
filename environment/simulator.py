@@ -1,16 +1,19 @@
+from typing import List, Tuple
+from environment.agent import Agent
 from shapely.geometry import Polygon
+from shapely.geometry.base import BaseGeometry
 
 class Simulator(object):
     """
     Runs a simulation of a game
     """
 
-    def __init__(self, agents, controllers, kill_zones):
+    def __init__(self, agents: List[Agent], controllers, kill_zones: List[Tuple[float, float]]):
         super().__init__()
         
         self.agents = agents
         self.controllers = controllers
-        self.kill_zones = kill_zones
+        self.kill_zones = [ Polygon(box) for box in kill_zones ]
         self.bullets = []
         self.dead_agents = {}
 
@@ -18,6 +21,16 @@ class Simulator(object):
     @property
     def alive_agents(self):
         return {agent_index: agent for agent_index, agent in enumerate(self.agents) if agent_index not in self.dead_agents}
+    
+    
+    def intersects_kill_zone(self, shape: BaseGeometry):
+        #Return true if shape intersects a kill zone
+        for zone in self.kill_zones:
+            if shape.intersects(zone):
+                return True
+
+        #Else, return false
+        return False
 
 
     def run_controllers(self, time_delta):
@@ -65,11 +78,8 @@ class Simulator(object):
             #Get hitbox for bullet
             bullet_rect = Polygon(bullet.get_rect())
 
-            #If bullet has hit a kill box, mark collided
-            for box in self.kill_zones:
-                box_rect = Polygon(box)
-                if bullet_rect.intersects(box_rect):
-                    collided = True
+            #If bullet has hit a kill zone, mark collided
+            collided = self.intersects_kill_zone(bullet_rect)
 
             #If bullet has hit an agent, impact agent and mark collided
             for agent in self.alive_agents.values():
@@ -104,12 +114,9 @@ class Simulator(object):
         for i, agent in enumerate(self.agents):
             agent_rect = Polygon(agent.get_rect())
 
-            for box in self.kill_zones:
-                box_rect = Polygon(box)
-                if agent_rect.intersects(box_rect):
-                    dead_agents.append(i)
-                    self.dead_agents[i] = agent
-                    break
+            if self.intersects_kill_zone(agent_rect):
+                dead_agents.append(i)
+                self.dead_agents[i] = agent
 
         #Return all agents that have 
         return dead_agents

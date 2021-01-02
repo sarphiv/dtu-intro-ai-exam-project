@@ -11,7 +11,7 @@ from environment.agent import Agent
 from environment.simulator import Simulator
 from environment.map import create_empty_map, create_middle_obstacle, create_spawns
 from game.keyboard_controller import create_keyboard_controller, wasd_control_scheme, uhjk_control_scheme
-from game.drawers import draw_bullet, draw_agent, draw_kill_box
+from game.drawers import draw_bullet, draw_agent, draw_kill_zone
 
 
 #Define distances
@@ -37,27 +37,6 @@ agent_colors = [
     (255, 127, 0),
 ]
 
-controllers = [
-    ##############################################################################################
-    #Choose controllers
-    # - Keyboard controlled agent
-    # - Idle AI agent
-    # - Spinbot AI agent
-    # - Seeker AI agent
-    # - Predictive seeker AI agent
-    ##############################################################################################
-
-    # create_keyboard_controller(lambda: pg_events, wasd_control_scheme),
-    # create_keyboard_controller(lambda: pg_events, uhjk_control_scheme)
-    # create_idle_controller(),
-    # create_spinbot_controller(),
-    # create_seeker_controller(),
-    create_predictive_seeker_controller(enemy_ids=range(2, 4)),
-    create_predictive_seeker_controller(enemy_ids=range(2, 4)),
-    create_predictive_seeker_controller(enemy_ids=range(0, 2)),
-    create_predictive_seeker_controller(enemy_ids=range(0, 2)),
-]
-
 map = create_empty_map(*map_size)
 wall = create_middle_obstacle(*map_size)
 
@@ -75,14 +54,38 @@ def create_agents():
               agent_size),
     ]
 
+#Helper function to create controllers for agents
+def create_controllers():
+    return [
+        ##############################################################################################
+        #Choose controllers
+        # - Keyboard controlled agent
+        # - Idle AI agent
+        # - Spinbot AI agent
+        # - Seeker AI agent
+        # - Predictive seeker AI agent
+        ##############################################################################################
+
+        # create_keyboard_controller(lambda: pg_events, wasd_control_scheme),
+        # create_keyboard_controller(lambda: pg_events, uhjk_control_scheme)
+        # create_idle_controller(),
+        # create_spinbot_controller(),
+        # create_seeker_controller(),
+        create_seeker_controller(enemy_ids=range(2, 4)),
+        create_seeker_controller(enemy_ids=range(2, 4)),
+        create_predictive_seeker_controller(enemy_ids=range(0, 2)),
+        create_predictive_seeker_controller(enemy_ids=range(0, 2)),
+    ]
+
 #Helper function to create simulation with required parameters
-def create_simulation(agents):
+def create_simulation(agents, controllers):
     return Simulator(agents, controllers, [*map, wall])
 
 
-#Create agents and simulation
+#Create agents, controllers, and simulation
 agents = create_agents()
-sim = create_simulation(agents)
+controllers = create_controllers()
+sim = create_simulation(agents, controllers)
 
 #NOTE: Uneven teams biases second team
 team_size = len(agents) // 2
@@ -95,13 +98,18 @@ winners = None
 #Game loop
 while running:
     if winners is not None:
-        #Prepare win text
-        winner = winners[0]
-        win_text = font.render(f"Player {winner+1} won!", True, agent_colors[winner])
+        #Prepare end text
+        if len(winners) > 0:
+            player_text = f"Player{'s' if len(winners)>1 else ''}"
+            end_text = font.render(f"{player_text} {' and '.join([str(w+1) for w in winners])} won!", 
+                                   True, #Antialiasing
+                                   agent_colors[winners[0]]) #Color
+        else:
+            end_text = font.render(f"Draw!", True, (128, 128, 128))
 
-        #Draw win text horizontally centered at top of screen
+        #Draw end text horizontally centered at top of screen
         (w, h) = map_size
-        window.blit(win_text, ((w-win_text.get_rect().width)//2, h//10))
+        window.blit(end_text, ((w-end_text.get_rect().width)//2, h//10))
 
         #Render to window
         pg.display.update()
@@ -109,8 +117,10 @@ while running:
 
         #Reset simulation
         winners = None
+        #Create agents, controllers, and simulation
         agents = create_agents()
-        sim = create_simulation(agents)
+        controllers = create_controllers()
+        sim = create_simulation(agents, controllers)
 
 
         #Pause game
@@ -145,9 +155,9 @@ while running:
         #Draw background
         window.fill((255, 255, 255))
 
-        #Draw kill boxes
-        for box in sim.kill_zones:
-            draw_kill_box(window, box)
+        #Draw kill zones
+        for zone in sim.kill_zones:
+            draw_kill_zone(window, zone)
 
         #Draw bullets
         for bullet in sim.bullets:

@@ -1,4 +1,4 @@
-from environment.enemy_chooser import create_enemy_chooser
+from enemy_chooser.first import create_first
 import numpy as np
 import math
 import random as r
@@ -6,7 +6,7 @@ from ai.idle import create_idle_controller
 
 def create_seeker_controller(enemy_ids):
     #Initialize state variables for controller
-    enemy_chooser = create_enemy_chooser(enemy_ids)
+    enemy_chooser = create_first(enemy_ids)
         
     #  Controller to activate if there are no enemies
     idle_controller = create_idle_controller()
@@ -17,10 +17,13 @@ def create_seeker_controller(enemy_ids):
         agent = simulator.agents[agent_id]
         
         #Choose enemy
-        enemy = enemy_chooser(simulator)
+        enemy_id = enemy_chooser(simulator, agent_id, time_delta)
         #If there are no enemies, idle
-        if enemy is None:
+        if enemy_id is None:
             return idle_controller(simulator, agent_id, time_delta)
+        #Else, mark enemy
+        else:
+            enemy = simulator.agents[enemy_id]
 
 
         #Calculate direction and distance to target

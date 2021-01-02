@@ -50,5 +50,9 @@ def draw_agent(surface, agent, color):
     pg.draw.circle(surface, gun_color, tuple(gun_position.astype(np.int)), round(gun_radius))
 
 
-def draw_kill_box(surface, box):
-    pg.draw.polygon(surface, (0, 0, 0), box)
+def draw_kill_zone(surface, zone):
+    x = zone.boundary.coords.xy[0][:-1]
+    y = zone.boundary.coords.xy[1][:-1]
+    
+    zone_coords = [(a, b) for a, b in zip(x, y)]
+    pg.draw.polygon(surface, (0, 0, 0), zone_coords)
