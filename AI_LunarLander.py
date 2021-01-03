@@ -1,62 +1,107 @@
 # Lunar Lander: AI-controlled play
 
-# Instructions:
-#   Land the rocket on the platform within a distance of plus/minus 20, 
-#   with a horizontal and vertical speed less than 20
-#
-# Controlling the rocket:
-#    arrows  : Turn booster rockets on and off
-#    r       : Restart game
-#    q / ESC : Quit
 
 from LunarLander import *
 
 env = LunarLander()
 env.reset()
 exit_program = False
+
+# Creating a NN : 
+# Setting things up : 
+import torch
+import torch.nn
+import random as r
+import numpy as np
+N = 64
+input_neurons = 5
+hidden_neurons = 6
+output_neurons = 8
+
+#Distance, speed, fuel, win
+reward_factors = np.array([-1.0, -0.6, 0.1, 100])
+
+
+# Creating network : 
+model = torch.nn.Sequential(
+            torch.nn.Linear(input_neurons, hidden_neurons),
+            torch.nn.ReLU(),
+            torch.nn.Linear(hidden_neurons, output_neurons),
+            torch.nn.Softmax()
+        )
+
+# Saving states 
+states = []
+actions = []
+rewards = []
+
+
+def action_to_index(boost, left, right):
+    return 4*boost + 2*left + right
+
+def index_to_action(index):
+    return (index // 4, (index % 4) // 2, index % 2)
+
 while not exit_program:
     env.render()
-    (x, y, xspeed, yspeed), reward, done = env.step((boost, left, right)) 
 
+    #Get state vector
+    input = torch.tensor([env.rocket.x, env.rocket.y, 
+                          env.rocket.xspeed, env.rocket.yspeed, 
+                          env.rocket.fuel])
+    
+    #Forward-pass through model
+    action_probabilities = model(input).detach().numpy()
+
+    #Randomly sample action from distribution
+    action_index = np.random.choice(np.arange(output_neurons), p = action_probabilities)
+    (boost, left, right) = index_to_action(action_index)
+
+    #Step
+    (x, y, x_speed, y_speed), reward, done = env.step((boost, left, right))
+    fuel = env.rocket.fuel
+    
+    #Save state, action, reward
+    states.append([x, y, x_speed, y_speed, fuel])
+    actions.append([action_to_index(*(boost, left, right))])
+
+    if done:
+        won = env.won
+        pos_delta = ((x - 400)**2 + (y-575)**2)**0.5
+        speed = (x_speed**2 + y_speed**2)**0.5
+
+        reward = reward_factors * np.array([pos_delta, speed, fuel, won]).sum()
+
+        rewards.append(reward)
+        
+  
     # Process game events
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             exit_program = True
-        if event.type == pygame.KEYDOWN:
-            if event.key in [pygame.K_ESCAPE, pygame.K_q]:
-                exit_program = True
-            if event.key == pygame.K_UP:
-                boost = True
-            if event.key == pygame.K_DOWN:
-                boost = False
-            if event.key == pygame.K_RIGHT:
-                left = False if right else True
-                right = False
-            if event.key == pygame.K_LEFT:
-                right = False if left else True
-                left = False
-            if event.key == pygame.K_r:
-                boost = False        
-                left = False
-                right = False
-                env.reset()
 
-    # INSERT YOUR CODE HERE
-    #
-    # Implement a Lunar Lander AI 
-    # Control the rocket by writing a list of if-statements that control the 
-    # three rockets on the lander 
-    #
-    # The information you have available are x, y, xspeed, and yspeed
-    # 
-    # You control the rockets by setting the variables boost, left, and right
-    # to either True or false
-    #
-    # Example, to get you started. If the rocket is close to the ground, turn
-    # on the main booster
-    if y < 100:
-        boost = True        
-    # Modify and add more if-statements to make the rocket land safely
-    # END OF YOUR CODE
+
+    # left = r.choice([True, False])
+    # right = r.choice([True, False])
+    # boost = r.choice([True, False])
+    
+    # # Action from neural net : 
+    # model_input = torch.Tensor((x, y, xspeed, yspeed))
+    
+    # model_output = model(model_input)
+    
+    # if model_output[0] - random.random() < 0:
+    #     boost = True
+    # else : 
+    #     boost = False
+    # if model_output[1] - random.random() < 0:
+    #     left = True
+    # else : 
+    #     left = False
+    # if model_output[2] - random.random() < 0:
+    #     right = True
+    # else :
+    #     right = False      
+
 
 env.close()
