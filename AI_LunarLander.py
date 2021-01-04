@@ -21,13 +21,13 @@ input_neurons = 5
 hidden_neurons1 = 64
 hidden_neurons2 = 64
 #hidden_neurons3 = 64
-output_neurons = 8
+output_neurons = 6
 
-platform_center_x = 400
+platform_center_x = 0
 
 #Distance, speed, fuel, win
 #reward_factors = np.array([-2.0, -0.2, 0.1, 100])
-reward_factors = np.array([-100, 0, 0, 100])
+reward_factors = np.array([-100, -10, 1, 200])
 
 
 # Creating network :
@@ -54,10 +54,30 @@ terminals = [ ]
 
 
 def action_to_index(boost, left, right):
-    return 4*boost + 2*left + right
+    #TODO: Fix this mess, I'm tired of things not working,
+    # SO THINGS JUST NEED TO WORK NOW
+    return {
+        (False, False, False): 0,
+        (False, True, True): 0,
+        (True, False, False): 1,
+        (True, True, True): 1,
+        (True, True, False): 2,
+        (True, False, True): 3,
+        (False, True, False): 4,
+        (False, False, True): 5,
+    }[boost, left, right]
 
 def index_to_action(index):
-    return (index // 4, (index % 4) // 2, index % 2)
+    #TODO: Fix this mess, I'm tired of things not working,
+    # SO THINGS JUST NEED TO WORK NOW
+    return {
+        0: (False, False, False),
+        1: (True, False, False),
+        2: (True, True, False),
+        3: (True, False, True),
+        4: (False, True, False),
+        5: (False, False, True),
+    }[index]
 
 counter = 0
 game_counter = 0
@@ -113,7 +133,7 @@ while not exit_program:
         
         # When done train the network and clear lists  
         if done:
-            if game_counter % 50 == 0:
+            if game_counter % 10 == 0:
                 train(model, states, actions, rewards, terminals)
                 states.clear()
                 actions.clear()
@@ -121,7 +141,7 @@ while not exit_program:
                 terminals.clear()
         
             env.reset()
-            env.rocket.x = 0
+            env.rocket.x = platform_center_x
             env.rocket.y = 300
             env.rocket.xspeed = 0
             env.rocket.yspeed = 0

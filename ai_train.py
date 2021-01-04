@@ -5,7 +5,7 @@ from typing import List
 
 
 # batch_size = 64
-learning_rate = 1e-5
+learning_rate = 1e-3
 future_discount = 0.99
 
 
@@ -39,8 +39,6 @@ def calculate_expected_reward(rewards: List[int], terminals: List[int]) -> np.nd
 
 def train(model, states, actions, rewards, terminals):
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-    loss = torch.nn.NLLLoss()
-
 
     t_states = torch.tensor(states)
     t_action = torch.tensor(actions)
@@ -58,8 +56,7 @@ def train(model, states, actions, rewards, terminals):
     # probs = action_probs[new_list].log()
     probs = action_probs[new_list].log()
 
-    
-    negated_reward = loss(logits.log(), torch.tensor([a[0] for a in actions], dtype=torch.long))
+    negated_reward = -(probs * t_expected_rewards).mean()
     #negated_reward = -(probs * t_expected_rewards).mean()
     
     optimizer.zero_grad()
