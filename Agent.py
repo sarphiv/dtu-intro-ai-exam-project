@@ -5,13 +5,16 @@ from PolicyGradient import PolicyGradient
 
 class Agent(object):
     def __init__(self, 
-                 policy: PolicyGradient, 
+                 policy: PolicyGradient, learning_rate,
                  future_discount, replay_buffer_size, replay_batch_size):
         #Initialize super class
         super().__init__()
         
         #Create policy
         self.policy = policy
+        
+        #Create optimizer
+        self.optimizer = T.optim.Adam(self.policy.parameters(), lr=learning_rate)
         
         #Create RNG
         self.rng = np.random.default_rng()
@@ -31,10 +34,10 @@ class Agent(object):
 
 
     def action(self, state):
-        #Feed state forward through policy and get logits for actions
-        logits = self.policy.forward(state)
+        #Feed state forward through policy and get probabilities for actions
+        probs = self.policy.forward(state)
         #Turn logits into a probability distribution
-        action_probs = T.distributions.Categorical(logits=logits)
+        action_probs = T.distributions.Categorical(probs=probs)
         #Sample one action from probability distribution
         action = action_probs.sample()
         
@@ -130,13 +133,13 @@ class Agent(object):
         normalized_rewards = T.tensor(normalized_rewards).to(self.policy.device)
 
         #Get action probabilities
-        logits = self.policy.forward(states)
-        action_log_probs = T.distributions.Categorical(logits=logits).log_prob(actions)
+        probs = self.policy.forward(states)
+        action_log_probs = T.distributions.Categorical(probs=probs).log_prob(actions)
 
         #Do gradient ascent on performance
         #NOTE: Same as gradient descent on negated performance
         negated_performance = -(action_log_probs * normalized_rewards).mean()
 
-        self.policy.optimizer.zero_grad()
+        self.optimizer.zero_grad()
         negated_performance.backward()
-        self.policy.optimizer.step()
+        self.optimizer.step()

@@ -1,30 +1,26 @@
 # Lunar Lander: AI-controlled play
 
 import os
+import torch
+import torch.nn
+import numpy as np
 from Agent import Agent
 from PolicyGradient import PolicyGradient
-from ai_train import normalize_state, train
 from LunarLander import *
 
-
+#Initialize environment
 env = LunarLander()
 env.reset()
 exit_program = False
 render_game = True
 
-# Creating a NN : 
-# Setting things up : 
-import torch
-import torch.nn
-import random as r
-import numpy as np
-
-
+#Game settings
+action_freq = 4
+game_train_freq = 10
 platform_center_x = 0
 
-action_counter = 0
-action_freq = 4
 
+#Path to existing policy
 policy_path = "policy.pth"
 
 #Distance, speed, fuel, win
@@ -35,9 +31,12 @@ if os.path.isfile(policy_path):
     policy = torch.load(policy_path)
 #Else create new policy
 else:
-    policy = PolicyGradient([5, 64, 64, 6], 1e-3, "cuda:0")
-    
-agent = Agent(policy, future_discount=0.9997,
+    policy = PolicyGradient([5, 32, 16, 6], "cuda:0")
+
+
+#Create agent with policy
+agent = Agent(policy, learning_rate=1e-3,
+              future_discount=0.9997,
               replay_buffer_size=6000, replay_batch_size=3000)
 
 
@@ -49,6 +48,7 @@ actions = []
 #[ r, ... ]: List[float]
 rewards = []
 
+#Helper methods
 def action_to_index(boost, left, right):
     #TODO: Fix this mess, I'm tired of things not working,
     # SO THINGS JUST NEED TO WORK NOW
@@ -75,22 +75,24 @@ def index_to_action(index):
         5: (False, False, True),
     }[index]
 
-counter = 0
+
+#Game counters
 game_counter = 0
+action_counter = 0
 while not exit_program:
-    counter += 1
-    
     if render_game:
         env.render()
         
     action_counter += 1
 
-    #Get state
+    #If agent should act, get next action and save it
     if action_counter % action_freq == 0:
-        current_state = normalize_state(env.rocket.x, env.rocket.y, 
-                                        env.rocket.xspeed, env.rocket.yspeed, 
-                                        env.rocket.fuel)
+        #Collect current state
+        current_state = [env.rocket.x, env.rocket.y, 
+                         env.rocket.xspeed, env.rocket.yspeed, 
+                         env.rocket.fuel]
         
+        #Get action based on current state
         action_id = agent.action(current_state)
         (boost, left, right) = index_to_action(action_id)
         
@@ -99,45 +101,46 @@ while not exit_program:
         states.append(current_state)
         actions.append(action_id)
 
-    #Step
+    #Step environment
     (x, y, x_speed, y_speed), _, done = env.step((boost, left, right))
-    fuel = env.rocket.fuel
     
-    # Always append reward (no intermediate rewards)
+    # Always append reward on each action (no intermediate rewards)
     if not done:
         if action_counter % action_freq == 0:
             rewards.append(0)
+    #Else game is done, store rewards
     else:
         game_counter += 1
         
-        # If the game is over we store the terminal rewards
-        won = env.won
+        #Calculate game rewards
         pos_delta = abs(x - platform_center_x)
         speed = (x_speed**2 + y_speed**2)**0.5
+        fuel = env.rocket.fuel
+        won = env.won
 
         reward = (reward_factors * np.array([pos_delta, speed, fuel, won])).sum()
-                
+
+        #Store rewards
         rewards.append(reward)
 
+        #Save episode states, actions, and rewards
         agent.save_episode(states, actions, rewards)
         
 
-        # When done train the network and clear lists  
-        if game_counter % 10 == 0:
+        #If training time, train and checkpoint on network
+        if game_counter % game_train_freq == 0:
             print(f"{game_counter}: {reward}")
             agent.train()
             torch.save(policy, policy_path)
 
-
+        
+        #Clear episode memory
         states.clear()
         actions.clear()
         rewards.clear()
 
+        #Reset game environment
         env.reset()
-        # env.rocket.x = platform_center_x
-        # env.rocket.y = 300
-        # env.rocket.xspeed = 0
-        # env.rocket.yspeed = 0
 
     
     # Process game events

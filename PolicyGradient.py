@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class PolicyGradient(nn.Module):
-    def __init__(self, layer_dims, learning_rate, device):
+    def __init__(self, layer_dims, device):
         #Initialize super class
         super(PolicyGradient, self).__init__()
 
@@ -15,9 +15,6 @@ class PolicyGradient(nn.Module):
             out_dim = layer_dims[i]
             
             setattr(self, f"layer{i}", nn.Linear(in_dim, out_dim))
-
-        #Create optimizer
-        self.optimizer = T.optim.Adam(self.parameters(), lr=learning_rate)
 
         #Set device
         self.device = device
@@ -39,8 +36,8 @@ class PolicyGradient(nn.Module):
         for layer in layers[:-1]:
             input = F.relu(layer(input))
 
-        #Feed through last layer but without activation function
-        output = layers[-1](input)
+        #Feed through last layer with softmax
+        output = F.softmax(layers[-1](input), dim=-1)
 
 
         #Return output (logits) of network
