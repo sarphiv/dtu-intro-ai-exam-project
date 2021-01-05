@@ -154,8 +154,10 @@ while not exit_program:
         fuel = env.rocket.fuel
         won = env.won
         
+        reward = np.array([pos_delta**0.25, speed, fuel, won])
         #print(pos_delta**0.25*reward_factors[0], speed*reward_factors[1], fuel*reward_factors[2], won*reward_factors[3])
-        reward = (reward_factors * np.array([pos_delta**0.25, speed, fuel, won])).sum()
+        #print(reward_factors * reward)
+        reward = (reward_factors * reward).sum()
 
         #Store rewards
         rewards.append(reward)

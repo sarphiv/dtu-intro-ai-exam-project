@@ -94,16 +94,9 @@ class Agent(object):
         expected_rewards = np.zeros_like(rewards)
         
         #Loop variables
-        #TODO: O(N**2) - Refactor for better time complexity
-        for i in range(len(rewards)):
-            discount = 1
-            expected_reward = 0
-
-            for r in rewards[i:]:
-                expected_reward += r * discount
-                discount *= self.future_discount
-                
-            expected_rewards[i] = expected_reward
+        expected_rewards = np.copy(rewards).astype(np.float)
+        for i in reversed(range(len(rewards)-1)):
+           expected_rewards[i] = rewards[i] + expected_rewards[i+1]*self.future_discount
 
 
         self.__write_replay_buffer(np.array(states), 
