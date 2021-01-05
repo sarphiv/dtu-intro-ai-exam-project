@@ -96,7 +96,7 @@ class Agent(object):
         #Loop variables
         #TODO: O(N**2) - Refactor for better time complexity
         for i in range(len(rewards)):
-            discount = self.future_discount
+            discount = 1
             expected_reward = 0
 
             for r in rewards[i:]:

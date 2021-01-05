@@ -13,11 +13,13 @@ env = LunarLander()
 env.reset()
 exit_program = False
 render_game = True
+expert_system = False
 
 #Game settings
 action_freq = 4
-game_train_freq = 10
+game_train_freq = 50
 platform_center_x = 0
+last_counter = 60
 
 
 #Path to existing policy
@@ -31,12 +33,12 @@ if os.path.isfile(policy_path):
     policy = torch.load(policy_path)
 #Else create new policy
 else:
-    policy = PolicyGradient([5, 32, 32, 6], "cuda:0")
+    policy = PolicyGradient([5, 64, 64, 6], "cpu")
 
 
 #Create agent with policy
-agent = Agent(policy, learning_rate=1e-3,
-              future_discount=0.99,
+agent = Agent(policy, learning_rate=1e-4,
+              future_discount=0.9997,
               replay_buffer_size=9000, replay_batch_size=3000)
 
 
@@ -47,6 +49,7 @@ states = []
 actions = []
 #[ r, ... ]: List[float]
 rewards = []
+last_rewards = []
 
 #Helper methods
 def action_to_index(boost, left, right):
@@ -93,8 +96,41 @@ while not exit_program:
                          env.rocket.fuel]
         
         #Get action based on current state
-        action_id = agent.action(current_state)
-        (boost, left, right) = index_to_action(action_id)
+        if not expert_system: 
+            action_id = agent.action(current_state)
+            (boost, left, right) = index_to_action(action_id)
+        else: 
+            boost = ( env.rocket.x < 175 and env.rocket.yspeed>3 or env.rocket.x < 7 and env.rocket.yspeed > 2 or env.rocket.x < 1 and env.rocket.yspeed >= 0 )
+            if abs(env.rocket.x)<=20 and env.rocket.yspeed < 19:
+
+                boost = False
+
+            if env.rocket.x < 0:
+                left = True
+                right = False
+                if env.rocket.x < -70 and env.rocket.xspeed >= 20:
+                    right = False
+                    left = False
+                if env.rocket.x >= -70 and env.rocket.xspeed >= 4:
+                    right = False
+                    left = False
+                if env.rocket.x > -3:
+                    right = False
+                    left = False
+
+            if 0 < env.rocket.x:
+                right = True
+                left = False
+                if env.rocket.x > 70 and env.rocket.xspeed <= -20:
+                    right = False
+                    left = False
+                if env.rocket.x < 70 and env.rocket.xspeed <= -4:
+                    right = False
+                    left = False
+                if env.rocket.x < 3:
+                    right = False
+                    left = False
+            action_id = action_to_index(boost, left, right)
         
         #Save state, action
         #NOTE: Reward is saved after taking action
@@ -117,8 +153,9 @@ while not exit_program:
         speed = (x_speed**2 + y_speed**2)**0.5
         fuel = env.rocket.fuel
         won = env.won
-
-        reward = (reward_factors * np.array([pos_delta, speed, fuel, won])).sum()
+        
+        #print(pos_delta**0.25*reward_factors[0], speed*reward_factors[1], fuel*reward_factors[2], won*reward_factors[3])
+        reward = (reward_factors * np.array([pos_delta**0.25, speed, fuel, won])).sum()
 
         #Store rewards
         rewards.append(reward)
@@ -126,10 +163,15 @@ while not exit_program:
         #Save episode states, actions, and rewards
         agent.save_episode(states, actions, rewards)
         
-
+        if len(last_rewards) < last_counter: 
+            last_rewards.append(reward)
+        else: 
+            last_rewards = last_rewards[1:] + [reward]
+                
         #If training time, train and checkpoint on network
-        if game_counter % game_train_freq == 0:
-            print(f"{game_counter}: {reward}")
+        if game_counter % game_train_freq == 0:           
+            print(f"{game_counter}: {sum(last_rewards)/len(last_rewards)}")
+            
             agent.train()
             torch.save(policy, policy_path)
 
@@ -150,5 +192,7 @@ while not exit_program:
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_r:
                 render_game = not render_game
+            if event.key == pygame.K_e:
+                expert_system = not expert_system
 
 env.close()
