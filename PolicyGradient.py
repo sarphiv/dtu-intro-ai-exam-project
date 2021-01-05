@@ -40,5 +40,5 @@ class PolicyGradient(nn.Module):
         output = F.softmax(layers[-1](input), dim=-1)
 
 
-        #Return output (logits) of network
+        #Return output (probalities) of network
         return output

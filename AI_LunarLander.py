@@ -31,13 +31,13 @@ if os.path.isfile(policy_path):
     policy = torch.load(policy_path)
 #Else create new policy
 else:
-    policy = PolicyGradient([5, 32, 16, 6], "cuda:0")
+    policy = PolicyGradient([5, 32, 32, 6], "cuda:0")
 
 
 #Create agent with policy
 agent = Agent(policy, learning_rate=1e-3,
-              future_discount=0.9997,
-              replay_buffer_size=6000, replay_batch_size=3000)
+              future_discount=0.99,
+              replay_buffer_size=9000, replay_batch_size=3000)
 
 
 # Saving states 

@@ -129,8 +129,8 @@ class Agent(object):
         expected_rewards = self.expected_reward_memory[episode_ids]
         mean = expected_rewards.mean()
         std = expected_rewards.std(ddof=1)
-        normalized_rewards = (expected_rewards - mean) / (std if std else 1)
-        normalized_rewards = T.tensor(normalized_rewards).to(self.policy.device)
+        standardized_rewards = (expected_rewards - mean) / (std if std else 1)
+        standardized_rewards = T.tensor(standardized_rewards).to(self.policy.device)
 
         #Get action probabilities
         probs = self.policy.forward(states)
@@ -138,7 +138,7 @@ class Agent(object):
 
         #Do gradient ascent on performance
         #NOTE: Same as gradient descent on negated performance
-        negated_performance = -(action_log_probs * normalized_rewards).mean()
+        negated_performance = -(action_log_probs * standardized_rewards).mean()
 
         self.optimizer.zero_grad()
         negated_performance.backward()
