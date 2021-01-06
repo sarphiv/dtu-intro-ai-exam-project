@@ -120,8 +120,8 @@ class Agent(object):
 
         #Standardize rewards to reduce variance
         expected_rewards = self.expected_reward_memory[episode_ids]
-        mean = expected_rewards.mean()
-        std = expected_rewards.std(ddof=1)
+        mean = self.expected_reward_memory.mean()
+        std = self.expected_reward_memory.std(ddof=1)
         standardized_rewards = (expected_rewards - mean) / (std if std else 1)
         standardized_rewards = T.tensor(standardized_rewards).to(self.policy.device)
 

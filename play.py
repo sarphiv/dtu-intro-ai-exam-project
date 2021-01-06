@@ -80,13 +80,13 @@ if os.path.isfile(policy_path):
     policy = T.load(policy_path)
 #Else create new policy
 else:
-    policy = PolicyGradient([7, 64, 32, 9], "cuda:0")
+    policy = PolicyGradient([7, 32, 16, 3], "cuda:0")
 
 
 #Create agent with policy
-agent = Agent(policy, learning_rate=1e-3,
+agent = Agent(policy, learning_rate=6e-4,
               future_discount=0.9997,
-              replay_buffer_size=12000, replay_batch_size=3000)
+              replay_buffer_size=30000, replay_batch_size=3000)
 
 
 # Saving states 
@@ -112,7 +112,8 @@ while running:
     # action = controller()
 
     #Simulate time step
-    state, reward, done = sim.step(time_delta, action)
+    state, reward, done = sim.step(time_delta, action + 6)
+    # state, reward, done = sim.step(time_delta, action)
     
     states.append(state)
     actions.append(action)
