@@ -3,22 +3,12 @@ import math
 
 from environment.agent import Agent
 from environment.map import get_map, map_amount
-from shapely.geometry import LineString, Point
+from shapely.geometry import LineString, Point, MultiPoint
 from shapely.geometry.base import BaseGeometry
+from game.action_space import id_to_action
 
 
-#Define agent action space
-action_space = [
-    (False, False, False, False),
-    (False, False, False,  True),
-    (False, False,  True, False),
-    (False,  True, False, False),
-    (False,  True, False,  True),
-    (False,  True,  True, False),
-    ( True, False, False, False),
-    ( True, False, False,  True),
-    ( True, False,  True, False),
-]
+
 
 
 class Simulator(object):
@@ -28,8 +18,8 @@ class Simulator(object):
 
     def __init__(self, 
                  map_size, map_front_segments, map_back_segments,
-                 checkpoint_reward, time_reward, lose_reward, win_reward,
-                 lap_amount, time_amount,
+                 checkpoint_reward, step_reward, lose_reward, win_reward,
+                 lap_amount, step_amount,
                  agent_size, agent_sensor_angles, agent_sensor_lengths):
         super().__init__()
 
@@ -45,13 +35,13 @@ class Simulator(object):
         
         #Define rewards
         self.checkpoint_reward = checkpoint_reward
-        self.time_reward = time_reward
+        self.time_reward = step_reward
         self.lose_reward = lose_reward
         self.win_reward = win_reward
         
-        #Define maximum laps and time
+        #Define maximum laps and step
         self.lap_amount = lap_amount
-        self.time_amount = time_amount
+        self.step_amount = step_amount
 
         #Define agent size and sensors
         self.agent_size = agent_size
@@ -83,7 +73,7 @@ class Simulator(object):
 
         #Set segment and time agent is at
         self.current_segment = 0
-        self.time_counter = 0
+        self.step_counter = 0
 
         #Calculate spawn point
         spawn_left = self.map[0, self.current_segment]
@@ -195,7 +185,7 @@ class Simulator(object):
 
     def update_agent(self, time_delta, action):
         #Deconstruct into action
-        (forward, backward, left, right) = action_space[action]
+        (forward, backward, left, right) = id_to_action[action]
 
         #Execute actions
         if forward != backward:
@@ -216,12 +206,18 @@ class Simulator(object):
         return window_line.intersects(agent_body_line)
     
     def check_time(self):
-        return self.time_counter >= self.time_amount
+        return self.step_counter >= self.step_amount
     
     def check_win(self):
         return self.lap_counter >= self.lap_amount
     
-    def get_state(self, window_line):
+    def get_state(self, window_line = None):
+        #If window line is not provided, get it
+        #NOTE: Can be provided to avoid double computation
+        if window_line is None:
+            window_line = self.get_window_walls_line()
+        
+        
         #Get rays and ray lines
         rays = self.get_sensors()
         ray_lines = self.get_sensor_lines(rays)
@@ -233,7 +229,13 @@ class Simulator(object):
         for i, ray in enumerate(ray_lines):
             #Get intersection of ray with window
             cross = window_line.intersection(ray)
-            
+
+
+            #If there are multiple intersections, take closest
+            if type(cross) is MultiPoint:
+                distances = np.linalg.norm(np.array(cross) - self.agent.position, axis=1)
+                cross = cross[np.argmin(distances)]
+                
             #If there is an interesection
             if type(cross) is Point:
                 #Calculate how close intersection is to agent 
@@ -273,12 +275,11 @@ class Simulator(object):
         #Get state of simulation
         state = self.get_state(window_line)
         
-        #Update time
-        self.time_counter += time_delta
-
+        #Update step
+        self.step_counter += 1
 
         #Add time reward
-        reward += self.time_reward * time_delta
+        reward += self.time_reward
 
         #If checkpoint hit, add reward, move checkpoint
         if self.check_checkpoint(checkpoint_line, agent_body_line):

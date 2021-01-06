@@ -16,7 +16,7 @@ class Agent(object):
                  move_backward_acceleration=0.0003,
                  turn_speed = 0.002,
                  velocity = np.zeros(2),
-                 velocity_resistance = 0.002,
+                 velocity_resistance = 0.003,
                  drift_speed_limit = 1e-1):
         super().__init__()
 
