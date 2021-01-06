@@ -3,56 +3,92 @@ import pygame as pg
 import numpy as np
 
 
-def draw_bullet(surface, bullet):
-    tracer_factor = 16
-    pos = tuple(bullet.position.astype(np.int))
-    tracer_end = tuple((bullet.position - bullet.velocity * tracer_factor).astype(np.int))
+checkpoint_color = (128, 255, 192)
+checkpoint_thickness = 2
+window_wall_color = (128, 128, 255)
+window_wall_thickness = 3
+wall_color = (192, 192, 192)
+wall_thickness = 2
 
-    #Draw tracer
-    pg.draw.aaline(surface, (255, 160, 160), pos, tracer_end)
+sensor_color = (192, 255, 128)
+sensor_thickness = 2
+
+sensor_point_color = (255, 64, 0)
+sensor_point_radius = 3
+
+agent_color = (0, 192, 255)
+agent_front_color = (128, 64, 128)
+
+
+def draw_window_walls(surface, coordinates):
+    pg.draw.lines(surface, 
+                  window_wall_color, 
+                  False, #Open line
+                  coordinates,
+                  window_wall_thickness)
+
+def draw_walls(surface, coordinates):
+    #Draw left wall
+    pg.draw.lines(surface, 
+                  wall_color, 
+                  True, #Closed line
+                  coordinates[0],
+                  wall_thickness)
+
+    #Draw right wall
+    pg.draw.lines(surface, 
+                  wall_color, 
+                  True, #Closed line
+                  coordinates[1],
+                  wall_thickness)
     
-    #Draw bullet
-    pg.draw.circle(surface, 
-                   (255, 0, 127), 
-                   pos, 
-                   bullet.width)
 
+def draw_checkpoint(surface, coordinates):
+    pg.draw.lines(surface,
+                  checkpoint_color, 
+                  False, #Open line
+                  coordinates, 
+                  checkpoint_thickness)
 
-def draw_agent(surface, agent, color):
+def draw_sensors(surface, state, sensors, agent_position):
+    points = (sensors[:, 1] - agent_position) * state[:len(sensors)].reshape(-1, 1) + agent_position
+    
+    #Draw sensor lines
+    for point in points:
+        pg.draw.line(surface, sensor_color, agent_position.astype(np.int), point.astype(np.int), sensor_thickness)
+    
+    #Draw sensor points
+    for point in points:
+        pg.draw.circle(surface, sensor_point_color, point.astype(np.int), sensor_point_radius)
+        
+
+def draw_agent(surface, agent):
     #Draw body
     agent_rect = agent.get_rect()
-    pg.draw.polygon(surface, color, agent_rect)
+    pg.draw.polygon(surface, agent_color, agent_rect)
+
+    #Draw front indicator
+    front_direction = agent.get_screen_direction()
+    front_position = agent.position + front_direction * agent.size[0] / 2
+    front_radius = agent.size[1] / 3
+    pg.draw.circle(surface, agent_front_color, tuple(front_position.astype(np.int)), round(front_radius))
 
 
-    #Draw gun indicator
-    (cool_width_scale, cool_height_scale) = (0.8, 0.6)
 
-    if agent.cooldown_active:
-        cooldown_percent = agent.cooldown_counter / agent.cooldown_time
-        cooldown_color = (255, 0, 0)
-    else:
-        cooldown_percent = agent.cooldown_counter / agent.cooldown_heat_max
-        cooldown_color = (min(max(round(255 * cooldown_percent), 0), 255), 0, min(max(round(255 * cooldown_percent), 0), 255))
+def draw_game(render, surface, simulator, state):
+    #If rendering, draw
+    if render:
+        #Draw background
+        surface.fill((255, 255, 255))
+
+        #Draw walls and checkpoint
+        draw_walls(surface, simulator.map)
+        draw_checkpoint(surface, simulator.get_checkpoint())
+        draw_window_walls(surface, simulator.get_window_walls())
         
-    cooldown_front_rect = agent.get_rect(cooldown_percent * cool_width_scale, cool_height_scale)
-    cooldown_back_rect = agent.get_rect(cool_width_scale, cool_height_scale)
-    
-    pg.draw.polygon(surface, (0, 0, 0), cooldown_back_rect)
-    pg.draw.polygon(surface, cooldown_color, cooldown_front_rect)
-
-
-    #Draw gun
-    gun_direction = agent.get_screen_direction()
-    gun_position = agent.position + gun_direction * agent.size[0] / 2
-    gun_radius = agent.bullet_width * 3 / 2
-    gun_color = (255, 0, 0) if agent.cooldown_active else (255, 0, 255)
-    
-    pg.draw.circle(surface, gun_color, tuple(gun_position.astype(np.int)), round(gun_radius))
-
-
-def draw_kill_zone(surface, zone):
-    x = zone.boundary.coords.xy[0][:-1]
-    y = zone.boundary.coords.xy[1][:-1]
-    
-    zone_coords = [(a, b) for a, b in zip(x, y)]
-    pg.draw.polygon(surface, (0, 0, 0), zone_coords)
+        #Draw sensors and agent
+        draw_sensors(surface, state, simulator.get_sensors(), simulator.agent.position)
+        draw_agent(surface, simulator.agent)
+        
+        #Update window
+        pg.display.update()

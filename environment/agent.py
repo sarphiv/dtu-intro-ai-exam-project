@@ -2,60 +2,34 @@ import math
 import numpy as np
 import copy
 
-from environment.bullet import Bullet
-
 
 class Agent(object):
     """
-    Agent with ability to fight and shoot
+    Agent with ability to move
     """
     
     def __init__(self, 
                  position, 
                  bearing, 
                  size,
-                 move_acceleration=0.0024,
-                 turn_speed = 0.004,
+                 move_forward_acceleration=0.0009,
+                 move_backward_acceleration=0.0003,
+                 turn_speed = 0.002,
                  velocity = np.zeros(2),
-                 velocity_resistance = 0.003,
-                 instability = 0,
-                 armor = 20,
-                 recoil = 0.05,
-                 burst_cooldown_time = 70,
-                 burst_cooldown_counter = 0,
-                 cooldown_heat = 200,
-                 cooldown_heat_max = 2000,
-                 cooldown_time = 1200,
-                 cooldown_counter = 0,
-                 bullet_speed = 2,
-                 bullet_width = 2,
-                 bullet_damage = 0.1):
+                 velocity_resistance = 0.002,
+                 drift_speed_limit = 1e-1):
         super().__init__()
 
         self.position = position
         self.bearing = bearing
         self.size = size
 
-        self.move_acceleration = move_acceleration
+        self.move_forward_acceleration = move_forward_acceleration
+        self.move_backward_acceleration = move_backward_acceleration
         self.turn_speed = turn_speed
         self.velocity = velocity.copy()
         self.velocity_resistance = velocity_resistance
-
-        self.instability = instability
-        self.armor = armor
-        self.recoil = recoil
-
-        self.burst_cooldown_time = burst_cooldown_time
-        self.burst_cooldown_counter = burst_cooldown_counter
-        self.cooldown_heat = cooldown_heat
-        self.cooldown_heat_max = cooldown_heat_max
-        self.cooldown_time = cooldown_time
-        self.cooldown_active = False
-        self.cooldown_counter = cooldown_counter
-        
-        self.bullet_speed = bullet_speed
-        self.bullet_width = bullet_width
-        self.bullet_damage = bullet_damage
+        self.drift_speed_limit = drift_speed_limit
 
 
     def deep_copy(self):
@@ -92,18 +66,8 @@ class Agent(object):
         c_v = v
         c_p = c_v/r + p
 
-        self.velocity = c_v*math.exp(-r*t)
-        self.position = c_v*math.exp(-r*t) / -r + c_p
-
-
-        #Reduce cooldown counters
-        if self.cooldown_counter > 0:
-            self.cooldown_counter -= time_delta
-            if self.cooldown_active and self.cooldown_counter <= 0:
-                self.cooldown_active = False
-
-        if self.burst_cooldown_counter > 0:
-            self.burst_cooldown_counter -= time_delta
+        self.velocity = c_v*np.exp(-r*t)
+        self.position = c_v*np.exp(-r*t) / -r + c_p
 
 
     def get_screen_direction(self, offset=0.0):
@@ -112,10 +76,12 @@ class Agent(object):
         return np.array([ np.cos(self.bearing + offset), 
                          -np.sin(self.bearing + offset)])
     
+    
     def get_screen_rotation(self):
         #Get ortonormal matrix to rotate relative to screen coordinates
         return np.array([[ np.cos(self.bearing), np.sin(self.bearing)],
                          [-np.sin(self.bearing), np.cos(self.bearing)]])
+    
     
     def get_rect(self, scale_width = 1, scale_height = 1):
         """
@@ -134,7 +100,31 @@ class Agent(object):
         absolute_corners = relative_corners + np.tile(self.position, (4, 1)).T
 
         #Return coordinates in a list of (x,y)-tuples
-        return [(x, y) for x, y in zip(*absolute_corners)]
+        return np.array([[x, y] for x, y in zip(*absolute_corners)])
+    
+    
+    def get_drift_angle(self):
+        #Calculate speed
+        speed = np.linalg.norm(self.velocity)
+
+        #If not moving, return zero because not drifting
+        if speed < self.drift_speed_limit:
+            return 0
+
+        #Deconstruct velocity
+        (x, y) = self.velocity
+        
+        #Calculate bearing from agent to position
+        #NOTE: y-axis has inverted screen coordinates
+        velocity_bearing = (math.acos(x / speed)) * (-1 if (y >= 0) else 1) % (2*math.pi)
+
+        #Calculate drift angle with sign needed
+        drift_angle = (velocity_bearing - self.bearing) % (2 * math.pi)
+        drift_angle += -2*math.pi if drift_angle > math.pi else 0
+
+
+        #Return angle between velocity and agent front
+        return drift_angle
 
 
     def turn(self, counter_clockwise, time_delta):
@@ -152,49 +142,13 @@ class Agent(object):
     def move(self, forward, time_delta):
         #Create direction vector
         d = self.get_screen_direction()
-        #If moving backwards, reverse direction
-        if not forward:
-            d = -d
+        
         #Calculate acceleration vector
-        a = d * self.move_acceleration
+        if forward:
+            a = d * self.move_forward_acceleration
+        else:
+            a = -d * self.move_backward_acceleration
 
         #Update velocity
         self.velocity += a * time_delta
-
-
-    def shoot(self):
-        #If gun on cooldown, do not shoot
-        if self.cooldown_active:
-            return None
-        #Else if gun on burst cooldown, do not shoot
-        elif self.burst_cooldown_counter > 0:
-            return None
-        #Else handle gun cooldown
-        else:
-            self.cooldown_counter += self.cooldown_heat
-            if self.cooldown_counter > self.cooldown_heat_max:
-                self.cooldown_active = True
-                self.cooldown_counter = self.cooldown_time
-
-            self.burst_cooldown_counter = self.burst_cooldown_time
-        
-        #Create direction vector
-        d = self.get_screen_direction()
-
-        #Recoil on agent
-        self.velocity -= d * self.recoil
-
-        #Spawn bullet at front of agent half a radius from tip
-        b_pos = self.position + d * (self.size[0] / 2 + self.bullet_width * 3 / 2)
-        #Fire bullet forwards and inherit agent velocity
-        b_vel = d * self.bullet_speed + self.velocity
-
-        #Return new bullet
-        return Bullet(b_pos, b_vel, self.bullet_width, self.bullet_damage)
-    
-    def impact(self, bullet):
-        #Receive damage
-        self.instability += bullet.damage / self.armor
-        #Update velocity with bullet velocity multiplied by health
-        self.velocity += bullet.velocity * self.instability
 
