@@ -130,17 +130,13 @@ class Agent(object):
 
         #Get action probabilities
         probs = self.policy.forward(states)
-        action_probs = T.distributions.Categorical(probs=probs)
-        action_log_probs = action_probs.log_prob(actions)
-        
-        #Calculate entropy
-        entropy = (action_probs.probs * action_probs.probs.log()).sum(1).mean() * 0.01
+        action_log_probs = T.distributions.Categorical(probs=probs).log_prob(actions)
 
 
         #Calculate losses
         #NOTE: Gradient ascent on performance.
         # Same as gradient descent on negated performance
-        negated_performance = -(action_log_probs * standardized_rewards).mean() - entropy
+        negated_performance = -(action_log_probs * standardized_rewards).mean()
 
         self.optimizer.zero_grad()
         negated_performance.backward()

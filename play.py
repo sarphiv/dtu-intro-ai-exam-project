@@ -2,6 +2,7 @@ import pygame as pg
 import numpy as np
 import random as r
 import math
+import time
 import os
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 import torch as T
@@ -70,7 +71,16 @@ while running:
 
     #If agent won/lost, renew agent and reset rendered environment
     if done:
+        #NOTE: If failed to load agent from file, tries again.
+        # Can happen if file is being updated.
+        while True:
+            try:
+                agent = create_agent()
+                break
+            except:
+                print("Failed while loading agent")
+                time.sleep(1.6)
+                continue
         #Retrieve agent from file again in case of updates
-        agent = create_agent()
         #Reset environment
         state = sim.reset() if randomize_map else sim.reset(sim.map_id, sim.map_direction)

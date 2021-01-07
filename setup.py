@@ -47,7 +47,7 @@ def create_agent():
         policy = T.load(policy_path)
     #Else create new policy
     else:
-        policy = Reinforce([5, 64, 64, 3], policy_device)
+        policy = Reinforce([5, 96, 64, 3], policy_device)
 
     #Return agent with policy
     return Agent(policy, learning_rate=6e-4,
