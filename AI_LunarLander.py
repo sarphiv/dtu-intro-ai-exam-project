@@ -7,6 +7,8 @@ import numpy as np
 from Agent import Agent
 from PolicyGradient import PolicyGradient
 from LunarLander import *
+from csv_manager import csv_manager
+from plot_manager import plot_manager
 
 #Initialize environment
 env = LunarLander()
@@ -14,6 +16,7 @@ env.reset()
 exit_program = False
 render_game = True
 expert_system = False
+update_graph = True
 
 #Game settings
 action_freq = 4
@@ -41,6 +44,16 @@ agent = Agent(policy, learning_rate=1e-4,
               future_discount=0.9997,
               replay_buffer_size=9000, replay_batch_size=3000)
 
+# Saving the scores and plotting tools 
+csv_file1 = csv_manager(["Games Played", "Avg Reward"], file_name="testing1.csv", clear=False) # this contains 300000 games trained while already good 
+csv_file2 = csv_manager(["Games Played", "Avg Reward"], file_name="testing2.csv", clear=False) # this is 350000 games converged but not solving -4000 score
+csv_file3 = csv_manager(["Games Played", "Avg Reward"], file_name="testing3.csv", clear=False) # this is 500000 games that converged 3 times on the perfect engine
+csv_file4 = csv_manager(["Games Played", "Avg Reward"], file_name="testing4.csv", clear=False) # Up's and downs
+csv_file5 = csv_manager(["Games Played", "Avg Reward"], file_name="testing5.csv", clear=False) # 2.4 million games converted on the best after 1.5 mil? 
+csv_file = csv_manager(["Games Played", "Avg Reward"], file_name="testing6.csv", clear=True)
+# If we already have something to compare to : 
+# csv_file2 = csv_manager(["Games Played", "Avg Reward"], file_name="NAME OF THAT FILE.csv", clear=False)
+plots = plot_manager([csv_file1,csv_file2,csv_file3,csv_file4,csv_file5,csv_file]) # remeber adding other csv_managers if they need to be plotted 
 
 # Saving states 
 #[ [x, y, x_s, y_s, f], ... ]: List[List[float, float, float, float, float]]
@@ -171,8 +184,15 @@ while not exit_program:
             last_rewards = last_rewards[1:] + [reward]
                 
         #If training time, train and checkpoint on network
-        if game_counter % game_train_freq == 0:           
-            print(f"{game_counter}: {sum(last_rewards)/len(last_rewards)}")
+        if game_counter % game_train_freq == 0:       
+            # save games_played and the running mean  
+            avg_reward_last_games = sum(last_rewards)/len(last_rewards)    
+            #print(f"{game_counter}: {sum(last_rewards)/len(last_rewards)}")
+            csv_file.save_data([game_counter, avg_reward_last_games])
+            
+            # Update the graph 
+            if update_graph: 
+                plots.plot()
             
             agent.train()
             torch.save(policy, policy_path)
@@ -196,5 +216,7 @@ while not exit_program:
                 render_game = not render_game
             if event.key == pygame.K_e:
                 expert_system = not expert_system
+            if event.key == pygame.K_g:
+                update_graph = not update_graph
 
 env.close()
