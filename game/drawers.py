@@ -75,20 +75,18 @@ def draw_agent(surface, agent):
 
 
 
-def draw_game(render, surface, simulator, state):
-    #If rendering, draw
-    if render:
-        #Draw background
-        surface.fill((255, 255, 255))
+def draw_game(surface, simulator, state):
+    #Draw background
+    surface.fill((255, 255, 255))
 
-        #Draw walls and checkpoint
-        draw_walls(surface, simulator.map)
-        draw_checkpoint(surface, simulator.get_checkpoint())
-        draw_window_walls(surface, simulator.get_window_walls())
-        
-        #Draw sensors and agent
-        draw_sensors(surface, state, simulator.get_sensors(), simulator.agent.position)
-        draw_agent(surface, simulator.agent)
-        
-        #Update window
-        pg.display.update()
+    #Draw walls and checkpoint
+    draw_walls(surface, simulator.map)
+    draw_checkpoint(surface, simulator.get_checkpoint())
+    draw_window_walls(surface, simulator.get_window_walls())
+    
+    #Draw sensors and agent
+    draw_sensors(surface, state, simulator.get_sensors(), simulator.agent.position)
+    draw_agent(surface, simulator.agent)
+    
+    #Update window
+    pg.display.update()

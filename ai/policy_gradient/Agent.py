@@ -1,11 +1,11 @@
 import numpy as np
 import torch as T
-from ai.policy_gradient.PolicyGradient import PolicyGradient
+from ai.policy_gradient.Reinforce import Reinforce
 
 
 class Agent(object):
     def __init__(self, 
-                 policy: PolicyGradient, learning_rate,
+                 policy: Reinforce, learning_rate,
                  future_discount, replay_buffer_size, replay_batch_size):
         #Initialize super class
         super().__init__()
@@ -40,7 +40,8 @@ class Agent(object):
         action_probs = T.distributions.Categorical(probs=probs)
         #Sample one action from probability distribution
         action = action_probs.sample()
-        
+
+
         #Return action
         return action.item()
 
@@ -90,17 +91,19 @@ class Agent(object):
 
 
     def save_episode(self, states, actions, rewards):
-        #Calculate expected reward for each state
+        #Initialize storage for expected rewards
         expected_rewards = np.zeros_like(rewards)
-        
-        #Loop variables
-        expected_rewards = np.copy(rewards).astype(np.float)
+        #Set last expected reward as last reward
+        expected_rewards[-1] = rewards[-1]
+
+        #Calculate expected rewards backwards
         for i in reversed(range(len(rewards)-1)):
            expected_rewards[i] = rewards[i] + expected_rewards[i+1]*self.future_discount
 
 
+        #Write to replay buffer
         self.__write_replay_buffer(np.array(states), 
-                                   np.array(actions), 
+                                   np.array(actions),
                                    expected_rewards)
 
 
@@ -112,12 +115,11 @@ class Agent(object):
         else:
             episode_limit = self.memory_write_index
 
-        #Sample (state, action, reward) triplets to train on
+        #Sample (state, action, expected_reward) triplets to train on
         episode_ids = self.rng.integers(0, episode_limit, size=self.replay_batch_size)
         
         states = T.tensor(self.state_memory[episode_ids]).to(self.policy.device)
         actions = T.tensor(self.action_memory[episode_ids]).to(self.policy.device)
-
         #Standardize rewards to reduce variance
         expected_rewards = self.expected_reward_memory[episode_ids]
         mean = self.expected_reward_memory.mean()
@@ -125,13 +127,20 @@ class Agent(object):
         standardized_rewards = (expected_rewards - mean) / (std if std else 1)
         standardized_rewards = T.tensor(standardized_rewards).to(self.policy.device)
 
+
         #Get action probabilities
         probs = self.policy.forward(states)
-        action_log_probs = T.distributions.Categorical(probs=probs).log_prob(actions)
+        action_probs = T.distributions.Categorical(probs=probs)
+        action_log_probs = action_probs.log_prob(actions)
+        
+        #Calculate entropy
+        entropy = (action_probs.probs * action_probs.probs.log()).sum(1).mean() * 0.01
 
-        #Do gradient ascent on performance
-        #NOTE: Same as gradient descent on negated performance
-        negated_performance = -(action_log_probs * standardized_rewards).mean()
+
+        #Calculate losses
+        #NOTE: Gradient ascent on performance.
+        # Same as gradient descent on negated performance
+        negated_performance = -(action_log_probs * standardized_rewards).mean() - entropy
 
         self.optimizer.zero_grad()
         negated_performance.backward()

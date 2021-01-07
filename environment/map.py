@@ -3,7 +3,7 @@ import math
 
 map_path = "maps.npy"
 map_global_scale = 0.9
-maps = np.load(map_path)
+maps = np.load(map_path, allow_pickle=True)
 map_amount = maps.shape[0]
 
 def get_min_max(map):
@@ -16,7 +16,8 @@ def get_min_max(map):
 
 def get_map(id, direction, width, height):
     #Retrieve map from cache
-    map = maps[id][:, ::-1 if direction else 1]
+    map = maps[id][:][::-1 if direction else 1]
+    map = np.array([map[0], map[1]])
 
     #Get smallest dimension of playground
     if width < height:
