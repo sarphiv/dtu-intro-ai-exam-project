@@ -10,13 +10,9 @@ from setup import create_simulator, create_agent, time_step, randomize_map, poli
 
 
 
-worker_episode_batch = 30
+worker_episode_batch = 12
 worker_procceses = 3
-training_repetitions = 3
 simulation_bar_length = 5
-training_bar_length = 6
-
-
 
 
 def start_worker(params):
@@ -99,7 +95,7 @@ def train():
             batches = executor.map(play_episodes, [simulation_bar_length // worker_procceses] * worker_procceses)
 
 
-        print("> COLLECTING BATCHES...", flush=True)
+        print("> COLLECTING BATCHES", flush=True)
         #Storage for mean reward
         summed_rewards = []
         
@@ -123,22 +119,13 @@ def train():
         print(f"{game_counter}: {np.array(summed_rewards).mean()}", end='')
 
 
-        print(" ==> TRAINING ", end='', flush=True)
+        print(" ==> TRAINING", end='', flush=True)
         T.enable_grad()
 
-        #Keep track of progress bar state
-        prev_progress_block = 0
-
-        for i in range(training_repetitions):
-            agent.train()
-
-            #Update progress bar
-            if int((i+1) / training_repetitions * training_bar_length) != prev_progress_block:
-                print('=', end='', flush=True)
-                prev_progress_block += 1
+        agent.train()
 
         T.save(agent.policy, policy_path)
-        print("> SAVED", end="\n\n", flush=True)
+        print(" ==> SAVED", end="\n\n", flush=True)
 
 
 

@@ -30,7 +30,7 @@ def create_simulator():
                     lose_reward=-10000,
                     win_reward=20000, 
                     lap_amount=2, 
-                    checkpoint_max_time=800,
+                    checkpoint_max_time=1000,
                     agent_size=np.array([10, 5]), 
                     agent_sensor_angles=[0, math.pi/3, -math.pi/3, math.pi/9, -math.pi/9],
                     agent_sensor_lengths=[180, 180, 180, 180, 180])
@@ -52,4 +52,5 @@ def create_agent():
     #Return agent with policy
     return Agent(policy, learning_rate=6e-4,
                  future_discount=0.997,
-                 replay_buffer_size=40000, replay_batch_size=9000)
+                 games_avg_store=48, games_avg_replay=30,
+                 replay_buffer_size=320000, replay_batch_size=9000)
