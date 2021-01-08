@@ -117,6 +117,9 @@ class Agent(object):
 
         #Add length of newest game to end
         self.games_steps_memory = np.append(self.games_steps_memory, len(states))
+        #If episodes are approaching a size that could be too big for the replay buffer, print warning
+        if self.games_steps_memory[-1] * self.games_avg_store > self.replay_buffer_size:
+            print(f"WARN: Encountered episode with step amount ({self.games_steps_memory[-1]}) * amount of average games to store ({self.games_avg_store}) > replay buffer size ({self.replay_buffer_size})")
 
 
         #Initialize storage for expected rewards
@@ -163,6 +166,9 @@ class Agent(object):
 
         #Randomly select recent samples from replay buffer
         sample_ids = self.rng.integers(sample_start_limit, sample_end_limit, size=steps_to_sample)
+        sampled_expected_rewards = self.expected_reward_memory[sample_ids]
+        mean = sampled_expected_rewards.mean()
+        std = sampled_expected_rewards.std(ddof=1)
         
         #Backpropagate through samples in batches
         #NOTE: Necessary if e.g. GPU does not have enough memory
@@ -183,8 +189,6 @@ class Agent(object):
             actions = T.tensor(self.action_memory[batch_sample_ids]).to(self.policy.device)
             #NOTE: Standardizing rewards to reduce variance
             expected_rewards = self.expected_reward_memory[batch_sample_ids]
-            mean = self.expected_reward_memory.mean()
-            std = self.expected_reward_memory.std(ddof=1)
             standardized_rewards = (expected_rewards - mean) / (std if std else 1)
             standardized_rewards = T.tensor(standardized_rewards).to(self.policy.device)
 

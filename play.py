@@ -7,7 +7,7 @@ import os
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 import torch as T
 
-from game.keyboard_controller import create_keyboard_controller, wasd_control_scheme, uhjk_control_scheme
+from game.keyboard_controller import create_keyboard_controller, wasd_control_scheme, dvorak_wasd_control_scheme
 from game.drawers import draw_game
 from setup import create_simulator, create_agent, map_size, time_step, randomize_map
 
@@ -16,8 +16,18 @@ from setup import create_simulator, create_agent, map_size, time_step, randomize
 
 #Define parameters
 running = True
-zoomed = False
-zoom_scale = 6.0
+restart = False
+
+zoomed = True
+zoom_in_scale = 6.0
+zoom_out_scale = 1.0
+zoom_scale_target = zoom_in_scale
+zoom_scale = zoom_out_scale
+zoom_pos_target = None #Defaults to car
+zoom_pos = map_size / 2
+zoom_scale_speed = 0.08
+zoom_pos_speed = 0.07
+
 
 pg.init()
 window = pg.display.set_mode(tuple(map_size))
@@ -31,7 +41,8 @@ pg_events = None
 sim, state = create_simulator()
 agent = create_agent()
 
-controller = create_keyboard_controller(lambda: pg_events, wasd_control_scheme)
+# controller = create_keyboard_controller(lambda: pg_events, wasd_control_scheme)
+# controller = create_keyboard_controller(lambda: pg_events, dvorak_wasd_control_scheme)
 
 
 #Helper functions to tidy up things
@@ -40,8 +51,19 @@ def handle_events():
     global time_delta
     global pg_events
     global running
+    global restart
     global zoomed
+    global zoom_scale
+    global zoom_pos
     
+    #Set zoom
+    zoom_pos_target = sim.car.position if zoomed else map_size / 2
+    zoom_scale_target = zoom_in_scale if zoomed else zoom_out_scale
+
+    zoom_scale += (zoom_scale_target - zoom_scale) * zoom_scale_speed
+    zoom_pos += (zoom_pos_target - zoom_pos) * zoom_pos_speed
+
+
     #Get time and events
     time_delta = time_step if time_step else clock.tick()
     pg_events = pg.event.get()
@@ -55,18 +77,19 @@ def handle_events():
                 randomize_map = not randomize_map
             if e.key == pg.K_z:
                 zoomed = not zoomed
+            if e.key == pg.K_r:
+                restart = True
+                    
 
-def zoom_to_car(points):
-    return ((points - sim.car.position) * zoom_scale + map_size / 2).astype(np.int)
-
-def no_zoom(points):
-    return points.astype(np.int)
+def zoomer(points):
+    return ((points - zoom_pos) * zoom_scale + map_size / 2).astype(np.int)
 
 
 #Game loop
 while running:
-    #Handle pygame events
+    #Handle game events
     handle_events()
+    
 
     #Get next action
     action = agent.action(state)
@@ -76,10 +99,11 @@ while running:
     state, reward, done = sim.step(time_delta, action)
 
     #Draw simulator environment
-    draw_game(window, sim, state, zoom_to_car if zoomed else no_zoom)
+    draw_game(window, sim, state, zoomer)
 
     #If agent won/lost, renew agent and reset rendered environment
-    if done:
+    if done or restart:
+        #Retrieve agent from file again in case of updates
         #NOTE: If failed to load agent from file, tries again.
         # Can happen if file is being updated.
         while True:
@@ -90,6 +114,6 @@ while running:
                 print("Failed while loading agent")
                 time.sleep(1.6)
                 continue
-        #Retrieve agent from file again in case of updates
+        restart = False
         #Reset environment
         state = sim.reset() if randomize_map else sim.reset(sim.map_id, sim.map_direction)

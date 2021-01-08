@@ -2,17 +2,19 @@ import numpy as np
 import random as r
 import math
 import os
+from datetime import datetime
 import torch as T
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 from concurrent.futures import ProcessPoolExecutor
 
-from setup import create_simulator, create_agent, time_step, randomize_map, policy_path
+from setup import create_simulator, create_agent, time_step, randomize_map, policy_path, freeze_snapshot_path
 
 
 
-worker_episode_batch = 12
+worker_episode_batch = 5
 worker_procceses = 3
-simulation_bar_length = 5
+episodes_per_freeze_snapshot = 64
+simulation_bar_length = 64
 
 
 def start_worker(params):
@@ -85,18 +87,23 @@ def train():
     #Create agent to train
     agent = create_agent()
     
-    #Create game counter
+    #Create game counters
     game_counter = 0
+    last_save_point = 0
 
+
+    #Training loop
     while True:
+        #Simulate episodes in parallel
         print("SIMULATING ", end='', flush=True)
         T.no_grad()
         with ProcessPoolExecutor() as executor:
             batches = executor.map(play_episodes, [simulation_bar_length // worker_procceses] * worker_procceses)
 
 
+        #Merge episode data
         print("> COLLECTING BATCHES", flush=True)
-        #Storage for mean reward
+        #Storage for summed reward
         summed_rewards = []
         
         #Iterate through each worker batch
@@ -116,15 +123,34 @@ def train():
         game_counter += worker_procceses * worker_episode_batch
 
         #Print mean reward
-        print(f"{game_counter}: {np.array(summed_rewards).mean()}", end='')
+        summed_mean = np.array(summed_rewards).mean()
+        print(f"{game_counter}: {summed_mean}", end='')
 
 
+        #Initiate training
         print(" ==> TRAINING", end='', flush=True)
         T.enable_grad()
 
         agent.train()
 
+
+        #Save current agent
         T.save(agent.policy, policy_path)
+
+
+        #If save checkpoint reached, store snapshot of current agent
+        if game_counter - last_save_point >= episodes_per_freeze_snapshot:
+            #Reset save checkpoint counter
+            last_save_point = game_counter
+            
+            #Prepare timestamp string
+            timestamp = datetime.utcnow().isoformat().replace(':', '-')
+
+            #Save snapshot
+            T.save(agent.policy, freeze_snapshot_path.format(timestamp, summed_mean))
+
+
+        #Print finish status message
         print(" ==> SAVED", end="\n\n", flush=True)
 
 

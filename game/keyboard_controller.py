@@ -8,11 +8,11 @@ wasd_control_scheme = [
     pg.K_d,     #Right
 ]
 
-uhjk_control_scheme = [
-    pg.K_u,     #Forward
-    pg.K_j,     #Backward
-    pg.K_h,     #Left
-    pg.K_k,     #Right
+dvorak_wasd_control_scheme = [
+    pg.K_PERIOD,    #Forward
+    pg.K_e,         #Backward
+    pg.K_o,         #Left
+    pg.K_u,         #Right
 ]
 
 

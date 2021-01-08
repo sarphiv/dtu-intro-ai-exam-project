@@ -18,7 +18,7 @@ class Simulator(object):
 
     def __init__(self, 
                  map_size, map_front_segments, map_back_segments,
-                 checkpoint_reward, step_reward, lose_reward, win_reward,
+                 checkpoint_reward, time_reward, lose_reward, win_reward,
                  lap_amount, checkpoint_max_time,
                  agent_size, agent_sensor_angles, agent_sensor_lengths):
         super().__init__()
@@ -35,7 +35,7 @@ class Simulator(object):
         
         #Define rewards
         self.checkpoint_reward = checkpoint_reward
-        self.time_reward = step_reward
+        self.time_reward = time_reward
         self.lose_reward = lose_reward
         self.win_reward = win_reward
         

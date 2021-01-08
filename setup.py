@@ -11,7 +11,8 @@ from ai.policy_gradient.Reinforce import Reinforce
 
 
 #Path to existing policy
-policy_path = "policy.pth"
+policy_path = "policy-snapshots/current-policy.pth"
+freeze_snapshot_path = "policy-snapshots/T{}-P{}-policy.pth"
 policy_device = "cuda:0"
 
 #Define parameters
@@ -24,16 +25,16 @@ map_size = np.array([1600, 900])
 def create_simulator():
     sim = Simulator(map_size=map_size, 
                     map_front_segments=4, 
-                    map_back_segments=2,
+                    map_back_segments=1,
                     checkpoint_reward=2000, 
-                    step_reward=-4,
+                    time_reward=-3,
                     lose_reward=-10000,
                     win_reward=20000, 
-                    lap_amount=2, 
-                    checkpoint_max_time=1000,
+                    lap_amount=1, 
+                    checkpoint_max_time=1200,
                     agent_size=np.array([10, 5]), 
-                    agent_sensor_angles=[0, math.pi/3, -math.pi/3, math.pi/9, -math.pi/9],
-                    agent_sensor_lengths=[180, 180, 180, 180, 180])
+                    agent_sensor_angles=[0, math.pi/24, -math.pi/24, math.pi/4, -math.pi/4, math.pi*6/14, -math.pi*6/14],
+                    agent_sensor_lengths=[220, 200, 200, 140, 140, 100, 100])
 
     state = sim.get_state()
 
@@ -47,10 +48,10 @@ def create_agent():
         policy = T.load(policy_path)
     #Else create new policy
     else:
-        policy = Reinforce([7, 64, 64, 7], policy_device) #NOTE: Not allowing turning on the spot
+        policy = Reinforce([9, 32, 32, 7], policy_device) #NOTE: Not allowing turning on the spot
 
     #Return agent with policy
     return Agent(policy, learning_rate=6e-4,
                  future_discount=0.997,
-                 games_avg_store=48, games_avg_replay=30,
-                 replay_buffer_size=320000, replay_batch_size=9000)
+                 games_avg_store=16, games_avg_replay=16,
+                 replay_buffer_size=640000, replay_batch_size=9000)
