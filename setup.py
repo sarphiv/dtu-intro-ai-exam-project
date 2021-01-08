@@ -26,12 +26,12 @@ def create_simulator():
                     map_front_segments=4, 
                     map_back_segments=2,
                     checkpoint_reward=2000, 
-                    step_reward=-1,
+                    step_reward=-2,
                     lose_reward=-10000,
                     win_reward=20000, 
                     lap_amount=2, 
-                    step_amount=12000,
-                    agent_size=np.array([20, 10]), 
+                    step_amount=4000,
+                    agent_size=np.array([10, 5]), 
                     agent_sensor_angles=[0, math.pi/3, -math.pi/3, math.pi/9, -math.pi/9],
                     agent_sensor_lengths=[180, 180, 180, 180, 180])
 
@@ -47,9 +47,9 @@ def create_agent():
         policy = T.load(policy_path)
     #Else create new policy
     else:
-        policy = Reinforce([5, 96, 64, 3], policy_device)
+        policy = Reinforce([5, 64, 64, 7], policy_device) #NOTE: Not allowing turning on the spot
 
     #Return agent with policy
     return Agent(policy, learning_rate=6e-4,
                  future_discount=0.997,
-                 replay_buffer_size=32000, replay_batch_size=9000)
+                 replay_buffer_size=40000, replay_batch_size=9000)

@@ -57,7 +57,7 @@ def play_episodes(progress_blocks):
             action = agent.action(state)
 
             #Simulate time step
-            state, reward, done = sim.step(time_step, action + 6)
+            state, reward, done = sim.step(time_step, action)
             
             #Save rewards
             episode_states.append(state)

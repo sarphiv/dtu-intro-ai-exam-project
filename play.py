@@ -49,8 +49,6 @@ def handle_events():
 
 sim, state = create_simulator()
 agent = create_agent()
-
-#Create temporary keyboard controller
 # controller = create_keyboard_controller(lambda: pg_events, wasd_control_scheme)
 
 
@@ -62,9 +60,10 @@ while running:
 
     #Get next action
     action = agent.action(state)
+    # action = controller()
 
     #Simulate time step
-    state, reward, done = sim.step(time_delta, action + 6)
+    state, reward, done = sim.step(time_delta, action)
 
     #Draw simulator environment
     draw_game(window, sim, state)

@@ -12,11 +12,11 @@ class Agent(object):
                  position, 
                  bearing, 
                  size,
-                 move_forward_acceleration=0.0005,
-                 move_backward_acceleration=0.0003,
-                 turn_speed = 0.003,
+                 move_forward_acceleration=0.00004,
+                 move_backward_acceleration=0.00002,
+                 turn_speed = 0.0004,
                  velocity = np.zeros(2),
-                 velocity_resistance = 0.010,
+                 velocity_resistance = 0.001,
                  drift_speed_limit = 1e-1):
         super().__init__()
 
