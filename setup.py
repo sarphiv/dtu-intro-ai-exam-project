@@ -47,7 +47,7 @@ def create_agent():
         policy = T.load(policy_path)
     #Else create new policy
     else:
-        policy = Reinforce([5, 64, 64, 7], policy_device) #NOTE: Not allowing turning on the spot
+        policy = Reinforce([7, 64, 64, 7], policy_device) #NOTE: Not allowing turning on the spot
 
     #Return agent with policy
     return Agent(policy, learning_rate=6e-4,

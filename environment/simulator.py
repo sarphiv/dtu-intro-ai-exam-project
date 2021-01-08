@@ -227,8 +227,8 @@ class Simulator(object):
         ray_lines = self.get_sensor_lines(rays)
         
         #Prepare state array
-        # state = np.zeros(len(ray_lines) + 2)
-        state = np.zeros(len(ray_lines))
+        state = np.zeros(len(ray_lines) + 2)
+        # state = np.zeros(len(ray_lines))
         
         #Iterate through each ray
         for i, ray in enumerate(ray_lines):
@@ -253,9 +253,9 @@ class Simulator(object):
                 state[i] = 1.0
 
         #Store agent velocity angle relative to agent front
-        #state[-2] = self.agent.get_drift_angle()
+        state[-2] = self.agent.get_drift_angle()
         #Store agent speed relative to agent size
-        #state[-1] = np.linalg.norm(self.agent.velocity) / self.agent.size[0]
+        state[-1] = np.linalg.norm(self.agent.velocity) / self.agent.size[0]
 
         #Return final state
         return state

@@ -1,7 +1,7 @@
 action_to_id = {
     (False, False, False, False): 0,
-    (False, False, False,  True): 7,
-    (False, False,  True, False): 8,
+    (False, False, False,  True): 0,#7,
+    (False, False,  True, False): 0,#8,
     (False,  True, False, False): 4,
     (False,  True, False,  True): 5,
     (False,  True,  True, False): 6,
