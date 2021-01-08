@@ -26,11 +26,11 @@ def create_simulator():
                     map_front_segments=4, 
                     map_back_segments=2,
                     checkpoint_reward=2000, 
-                    step_reward=-2,
+                    step_reward=-4,
                     lose_reward=-10000,
                     win_reward=20000, 
                     lap_amount=2, 
-                    step_amount=4000,
+                    checkpoint_max_time=800,
                     agent_size=np.array([10, 5]), 
                     agent_sensor_angles=[0, math.pi/3, -math.pi/3, math.pi/9, -math.pi/9],
                     agent_sensor_lengths=[180, 180, 180, 180, 180])

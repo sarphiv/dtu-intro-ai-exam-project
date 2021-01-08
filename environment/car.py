@@ -3,7 +3,7 @@ import numpy as np
 import copy
 
 
-class Agent(object):
+class Car(object):
     """
     Agent with ability to move
     """

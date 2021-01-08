@@ -16,6 +16,8 @@ from setup import create_simulator, create_agent, map_size, time_step, randomize
 
 #Define parameters
 running = True
+zoomed = False
+zoom_scale = 6.0
 
 pg.init()
 window = pg.display.set_mode(tuple(map_size))
@@ -26,12 +28,19 @@ time_delta = time_step
 pg_events = None
 
 
-#Helper function to tidy up things
+sim, state = create_simulator()
+agent = create_agent()
+
+controller = create_keyboard_controller(lambda: pg_events, wasd_control_scheme)
+
+
+#Helper functions to tidy up things
 def handle_events():
     global randomize_map
     global time_delta
     global pg_events
     global running
+    global zoomed
     
     #Get time and events
     time_delta = time_step if time_step else clock.tick()
@@ -44,13 +53,14 @@ def handle_events():
         if e.type == pg.KEYDOWN:
             if e.key == pg.K_m:
                 randomize_map = not randomize_map
+            if e.key == pg.K_z:
+                zoomed = not zoomed
 
+def zoom_to_car(points):
+    return ((points - sim.car.position) * zoom_scale + map_size / 2).astype(np.int)
 
-
-sim, state = create_simulator()
-agent = create_agent()
-# controller = create_keyboard_controller(lambda: pg_events, wasd_control_scheme)
-
+def no_zoom(points):
+    return points.astype(np.int)
 
 
 #Game loop
@@ -66,7 +76,7 @@ while running:
     state, reward, done = sim.step(time_delta, action)
 
     #Draw simulator environment
-    draw_game(window, sim, state)
+    draw_game(window, sim, state, zoom_to_car if zoomed else no_zoom)
 
     #If agent won/lost, renew agent and reset rendered environment
     if done:

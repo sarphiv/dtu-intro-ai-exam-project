@@ -1,7 +1,7 @@
 import numpy as np
 import math
 
-from environment.agent import Agent
+from environment.car import Car
 from environment.map import get_map, map_amount
 from shapely.geometry import LineString, Point, MultiPoint
 from shapely.geometry.base import BaseGeometry
@@ -19,7 +19,7 @@ class Simulator(object):
     def __init__(self, 
                  map_size, map_front_segments, map_back_segments,
                  checkpoint_reward, step_reward, lose_reward, win_reward,
-                 lap_amount, step_amount,
+                 lap_amount, checkpoint_max_time,
                  agent_size, agent_sensor_angles, agent_sensor_lengths):
         super().__init__()
 
@@ -41,7 +41,7 @@ class Simulator(object):
         
         #Define maximum laps and step
         self.lap_amount = lap_amount
-        self.step_amount = step_amount
+        self.checkpoint_max_time = checkpoint_max_time
 
         #Define agent size and sensors
         self.agent_size = agent_size
@@ -73,7 +73,7 @@ class Simulator(object):
 
         #Set segment and time agent is at
         self.current_segment = 0
-        self.step_counter = 0
+        self.checkpoint_time_counter = 0
 
         #Calculate spawn point
         spawn_left = self.map[0, self.current_segment]
@@ -94,7 +94,7 @@ class Simulator(object):
 
 
         #Spawn agent
-        self.agent = Agent(spawn_point, spawn_orientation, self.agent_size)
+        self.car = Car(spawn_point, spawn_orientation, self.agent_size)
 
 
         #Return state
@@ -140,21 +140,21 @@ class Simulator(object):
         return self.map[:, (self.current_segment + 1) % self.map_segments]
 
     def get_agent_body(self):
-        return self.agent.get_rect()
+        return self.car.get_rect()
     
     def get_sensors(self):
         rays = np.zeros((len(self.agent_sensor_angles), 2, 2))
 
         for i, angle in enumerate(self.agent_sensor_angles):
             #Get direction of ray offset from agent direction
-            ray_direction = self.agent.get_screen_direction(offset=angle)
+            ray_direction = self.car.get_screen_direction(offset=angle)
             #Scale ray vector
             ray = ray_direction * self.agent_sensor_lengths[i]
 
             #Start point of ray is agent
-            rays[i, 0] = self.agent.position
+            rays[i, 0] = self.car.position
             #End point is ray vector + agent
-            rays[i, 1] = ray + self.agent.position
+            rays[i, 1] = ray + self.car.position
 
         #Return all rays
         return rays
@@ -193,14 +193,14 @@ class Simulator(object):
 
         #Execute actions
         if forward != backward:
-            self.agent.move(forward, time_delta)
+            self.car.move(forward, time_delta)
 
         if left != right:
-            self.agent.turn(left, time_delta)
+            self.car.turn(left, time_delta)
 
 
         #Update agent
-        self.agent.update(time_delta)
+        self.car.update(time_delta)
 
 
     def check_checkpoint(self, checkpoint_line, agent_body_line):
@@ -210,7 +210,7 @@ class Simulator(object):
         return window_line.intersects(agent_body_line)
     
     def check_time(self):
-        return self.step_counter >= self.step_amount
+        return self.checkpoint_time_counter >= self.checkpoint_max_time
     
     def check_win(self):
         return self.lap_counter >= self.lap_amount
@@ -238,24 +238,24 @@ class Simulator(object):
 
             #If there are multiple intersections, take closest
             if type(cross) is MultiPoint:
-                distances = np.linalg.norm(np.array(cross) - self.agent.position, axis=1)
+                distances = np.linalg.norm(np.array(cross) - self.car.position, axis=1)
                 cross = cross[np.argmin(distances)]
                 
             #If there is an interesection
             if type(cross) is Point:
                 #Calculate how close intersection is to agent 
                 # relative to length of ray
-                direction = self.agent.position - np.array([cross.x, cross.y])
+                direction = self.car.position - np.array([cross.x, cross.y])
                 #Store relative length
-                state[i] = np.linalg.norm(direction) / np.linalg.norm(rays[i, 1] - self.agent.position)
+                state[i] = np.linalg.norm(direction) / np.linalg.norm(rays[i, 1] - self.car.position)
             #Else, there is no intersection, set state for ray to max distance
             else:
                 state[i] = 1.0
 
         #Store agent velocity angle relative to agent front
-        state[-2] = self.agent.get_drift_angle()
+        state[-2] = self.car.get_drift_angle()
         #Store agent speed relative to agent size
-        state[-1] = np.linalg.norm(self.agent.velocity) / self.agent.size[0]
+        state[-1] = np.linalg.norm(self.car.velocity) / self.car.size[0]
 
         #Return final state
         return state
@@ -281,15 +281,16 @@ class Simulator(object):
         state = self.get_state(window_line)
         
         #Update step
-        self.step_counter += 1
+        self.checkpoint_time_counter += 1
 
         #Add time reward
         reward += self.time_reward
 
-        #If checkpoint hit, add reward, move checkpoint
+        #If checkpoint hit, add reward, move checkpoint and reset checkpoint time
         if self.check_checkpoint(checkpoint_line, agent_body_line):
             reward += self.checkpoint_reward
             self.current_segment += 1
+            self.checkpoint_time_counter = 0
         
         #If lost, give reward and mark terminal
         if self.check_collision(window_line, agent_body_line) or self.check_time():

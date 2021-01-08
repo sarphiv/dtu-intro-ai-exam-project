@@ -16,8 +16,8 @@ def get_min_max(map):
 
 def get_map(id, direction, width, height):
     #Retrieve map from cache
-    map = maps[id][:][::-1 if direction else 1]
-    map = np.array([map[0], map[1]])
+    map = maps[id]
+    map = np.array([map[0], map[1]])[:, ::-1 if direction else 1]
 
     #Get smallest dimension of playground
     if width < height:

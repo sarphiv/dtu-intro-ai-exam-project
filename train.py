@@ -10,9 +10,9 @@ from setup import create_simulator, create_agent, time_step, randomize_map, poli
 
 
 
-worker_episode_batch = 20
-worker_procceses = 4
-training_repetitions = 2
+worker_episode_batch = 30
+worker_procceses = 3
+training_repetitions = 3
 simulation_bar_length = 5
 training_bar_length = 6
 
@@ -77,7 +77,7 @@ def play_episodes(progress_blocks):
 
         #Update progress bar
         if int((i+1) / worker_episode_batch * progress_blocks) != prev_progress_block:
-            print('=', end='')
+            print('=', end='', flush=True)
             prev_progress_block += 1
 
 
@@ -93,13 +93,13 @@ def train():
     game_counter = 0
 
     while True:
-        print("SIMULATING ", end='')
+        print("SIMULATING ", end='', flush=True)
         T.no_grad()
         with ProcessPoolExecutor() as executor:
             batches = executor.map(play_episodes, [simulation_bar_length // worker_procceses] * worker_procceses)
 
 
-        print("> COLLECTING BATCHES...")
+        print("> COLLECTING BATCHES...", flush=True)
         #Storage for mean reward
         summed_rewards = []
         
@@ -123,7 +123,7 @@ def train():
         print(f"{game_counter}: {np.array(summed_rewards).mean()}", end='')
 
 
-        print(" ==> TRAINING ", end='')
+        print(" ==> TRAINING ", end='', flush=True)
         T.enable_grad()
 
         #Keep track of progress bar state
@@ -134,11 +134,11 @@ def train():
 
             #Update progress bar
             if int((i+1) / training_repetitions * training_bar_length) != prev_progress_block:
-                print('=', end='')
+                print('=', end='', flush=True)
                 prev_progress_block += 1
 
         T.save(agent.policy, policy_path)
-        print("> SAVED", end="\n\n")
+        print("> SAVED", end="\n\n", flush=True)
 
 
 
