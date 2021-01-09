@@ -189,18 +189,10 @@ class Simulator(object):
 
     def update_agent(self, time_delta, action):
         #Deconstruct into action
-        (forward, backward, left, right) = id_to_action[action]
-
-        #Execute actions
-        if forward != backward:
-            self.car.move(forward, time_delta)
-
-        if left != right:
-            self.car.turn(left, time_delta)
-
+        action_tuple = id_to_action[action]
 
         #Update agent
-        self.car.update(time_delta)
+        self.car.update(time_delta, action_tuple)
 
 
     def check_checkpoint(self, checkpoint_line, agent_body_line):

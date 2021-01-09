@@ -41,8 +41,8 @@ def create_simulator():
                     lap_amount=1, 
                     checkpoint_max_time=1200,
                     agent_size=np.array([10, 5]), 
-                    agent_sensor_angles=[0, math.pi/24, -math.pi/24, math.pi/4, -math.pi/4, math.pi*6/14, -math.pi*6/14],
-                    agent_sensor_lengths=[220, 200, 200, 140, 140, 100, 100])
+                    agent_sensor_angles=[0, math.pi/20, -math.pi/20, math.pi/5, -math.pi/5, math.pi*6/14, -math.pi*6/14],
+                    agent_sensor_lengths=[220, 200, 200, 160, 160, 100, 100])
 
     state = sim.get_state()
 
