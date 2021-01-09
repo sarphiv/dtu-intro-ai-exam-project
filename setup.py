@@ -10,10 +10,18 @@ from ai.policy_gradient.Reinforce import Reinforce
 
 
 
-#Path to existing policy
+#Path to policies
 policy_path = "policy-snapshots/current-policy.pth"
-freeze_snapshot_path = "policy-snapshots/T{}-P{}-policy.pth"
+freeze_snapshot_path = "policy-snapshots/D{}-P{}-policy.pth"
+
+#Plot related options
+plot_data_path = "plot-data/current-plot.csv"
+plot_x_axis = "Episodes simulated"
+plot_y_axis = "Avg. summed batch reward"
+
+#Policy training device
 policy_device = "cuda:0"
+
 
 #Define parameters
 randomize_map = True

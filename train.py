@@ -1,3 +1,4 @@
+from plotting.CsvManager import CsvManager
 import numpy as np
 import random as r
 import math
@@ -7,7 +8,7 @@ import torch as T
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 from concurrent.futures import ProcessPoolExecutor
 
-from setup import create_simulator, create_agent, time_step, randomize_map, policy_path, freeze_snapshot_path
+from setup import create_simulator, create_agent, time_step, randomize_map, policy_path, freeze_snapshot_path, plot_data_path, plot_x_axis, plot_y_axis
 
 
 
@@ -15,10 +16,6 @@ worker_episode_batch = 5
 worker_procceses = 3
 episodes_per_freeze_snapshot = 64
 simulation_bar_length = 64
-
-
-def start_worker(params):
-    return play_episodes(*params)
 
 
 def play_episodes(progress_blocks):
@@ -87,9 +84,12 @@ def train():
     #Create agent to train
     agent = create_agent()
     
-    #Create game counters
-    game_counter = 0
+    #Create simulation counters
+    episode_counter = 0
     last_save_point = 0
+    
+    #Create simulation data file
+    plot_file = CsvManager([plot_x_axis, plot_y_axis], file_name=plot_data_path, clear=True)
 
 
     #Training loop
@@ -120,11 +120,13 @@ def train():
 
 
         #Update game counter
-        game_counter += worker_procceses * worker_episode_batch
+        episode_counter += worker_procceses * worker_episode_batch
 
-        #Print mean reward
+        #Print and save mean summed reward
         summed_mean = np.array(summed_rewards).mean()
-        print(f"{game_counter}: {summed_mean}", end='')
+
+        print(f"{episode_counter}: {summed_mean}", end='', flush=True)
+        plot_file.save_data([episode_counter, summed_mean])
 
 
         #Initiate training
@@ -139,9 +141,9 @@ def train():
 
 
         #If save checkpoint reached, store snapshot of current agent
-        if game_counter - last_save_point >= episodes_per_freeze_snapshot:
+        if episode_counter - last_save_point >= episodes_per_freeze_snapshot:
             #Reset save checkpoint counter
-            last_save_point = game_counter
+            last_save_point = episode_counter
             
             #Prepare timestamp string
             timestamp = datetime.utcnow().isoformat().replace(':', '-')

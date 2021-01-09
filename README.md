@@ -1,7 +1,7 @@
 # Instructions
 
-The `play.py` file is an interactive way to play the brawler game.
+The `play.py` file is used to view the currently trained agent playing
 
-The `train.py` file is a stripped down simulation of the game to be used to for training AI.
+The `train.py` file is used to train the agent in parallel
 
-AI controllers should be defined in the `ai/` directory.
+The `plot.py` file is used to view training performance.
