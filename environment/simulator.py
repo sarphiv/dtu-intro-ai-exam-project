@@ -18,8 +18,8 @@ class Simulator(object):
 
     def __init__(self, 
                  map_size, map_front_segments, map_back_segments,
-                 checkpoint_reward, time_reward, lose_reward, win_reward,
-                 lap_amount, checkpoint_max_time,
+                 checkpoint_reward, lose_reward, speed_reward,
+                 simulation_max_time, checkpoint_max_time,
                  agent_size, agent_sensor_angles, agent_sensor_lengths):
         super().__init__()
 
@@ -35,13 +35,12 @@ class Simulator(object):
         
         #Define rewards
         self.checkpoint_reward = checkpoint_reward
-        self.time_reward = time_reward
         self.lose_reward = lose_reward
-        self.win_reward = win_reward
+        self.speed_reward = speed_reward
         
         #Define maximum laps and step
-        self.lap_amount = lap_amount
         self.checkpoint_max_time = checkpoint_max_time
+        self.simulation_max_time = simulation_max_time
 
         #Define agent size and sensors
         self.agent_size = agent_size
@@ -74,6 +73,7 @@ class Simulator(object):
         #Set segment and time agent is at
         self.current_segment = 0
         self.checkpoint_time_counter = 0
+        self.simulation_time_counter = 0
 
         #Calculate spawn point
         spawn_left = self.map[0, self.current_segment]
@@ -201,11 +201,12 @@ class Simulator(object):
     def check_collision(self, window_line, agent_body_line):
         return window_line.intersects(agent_body_line)
     
-    def check_time(self):
+    def check_checkpoint_time(self):
         return self.checkpoint_time_counter >= self.checkpoint_max_time
     
-    def check_win(self):
-        return self.lap_counter >= self.lap_amount
+    def check_simulation_time(self):
+        return self.simulation_time_counter >= self.simulation_max_time
+
     
     def get_state(self, window_line = None):
         #If window line is not provided, get it
@@ -220,7 +221,6 @@ class Simulator(object):
         
         #Prepare state array
         state = np.zeros(len(ray_lines) + 2)
-        # state = np.zeros(len(ray_lines))
         
         #Iterate through each ray
         for i, ray in enumerate(ray_lines):
@@ -238,16 +238,16 @@ class Simulator(object):
                 #Calculate how close intersection is to agent 
                 # relative to length of ray
                 direction = self.car.position - np.array([cross.x, cross.y])
-                #Store relative length
-                state[i] = np.linalg.norm(direction) / np.linalg.norm(rays[i, 1] - self.car.position)
+                #Store length
+                state[i] = np.linalg.norm(direction)
             #Else, there is no intersection, set state for ray to max distance
             else:
-                state[i] = 1.0
+                state[i] = np.linalg.norm(rays[i, 1] - self.car.position)
 
-        #Store agent velocity angle relative to agent front
+
+        #Store agent velocity angle relative to agent front, and agent speed
         state[-2] = self.car.get_drift_angle()
-        #Store agent speed relative to agent size
-        state[-1] = np.linalg.norm(self.car.velocity) / self.car.size[0]
+        state[-1] = np.linalg.norm(self.car.velocity)
 
         #Return final state
         return state
@@ -257,8 +257,8 @@ class Simulator(object):
         #Initialize variables
         reward = 0
         done = False
-        
-        
+
+
         #Execute action and update agent
         self.update_agent(time_delta, action)
 
@@ -272,27 +272,27 @@ class Simulator(object):
         #Get state of simulation
         state = self.get_state(window_line)
         
-        #Update step
+        #Update time
         self.checkpoint_time_counter += 1
+        self.simulation_time_counter += 1
 
-        #Add time reward
-        reward += self.time_reward
+        
+        #Give speed reward
+        reward += np.linalg.norm(self.car.velocity) * self.speed_reward
 
         #If checkpoint hit, add reward, move checkpoint and reset checkpoint time
         if self.check_checkpoint(checkpoint_line, agent_body_line):
             reward += self.checkpoint_reward
             self.current_segment += 1
             self.checkpoint_time_counter = 0
-        
-        #If lost, give reward and mark terminal
-        if self.check_collision(window_line, agent_body_line) or self.check_time():
+
+        #If lost (by collision or checkpoint time), give reward and mark terminal
+        if self.check_collision(window_line, agent_body_line) or self.check_checkpoint_time():
             reward += self.lose_reward
             done = True
 
-        #NOTE: Can lose and win at the same time.
-        #If won, give reward and mark terminal
-        if self.check_win():
-            reward += self.win_reward
+        #If simulation ended, mark terminal 
+        if self.check_simulation_time():
             done = True
 
 

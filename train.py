@@ -12,8 +12,8 @@ from setup import create_simulator, create_agent, time_step, randomize_map, poli
 
 
 
-worker_episode_batch = 5
-worker_procceses = 3
+worker_episode_batch = 1
+worker_procceses = 1
 episodes_per_freeze_snapshot = 64
 simulation_bar_length = 64
 
@@ -89,7 +89,7 @@ def train():
     last_save_point = 0
     
     #Create simulation data file
-    plot_file = CsvManager([plot_x_axis, plot_y_axis], file_name=plot_data_path, clear=True)
+    plot_file = CsvManager([plot_x_axis, plot_y_axis], file_name=plot_data_path, clear=False)
 
 
     #Training loop
@@ -149,7 +149,7 @@ def train():
             timestamp = datetime.utcnow().isoformat().replace(':', '-')
 
             #Save snapshot
-            T.save(agent.policy, freeze_snapshot_path.format(timestamp, summed_mean))
+            T.save(agent.policy, freeze_snapshot_path.format(timestamp, episode_counter, summed_mean))
 
 
         #Print finish status message

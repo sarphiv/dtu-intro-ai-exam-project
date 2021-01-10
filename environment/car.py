@@ -20,7 +20,7 @@ class Car(object):
                  engine_force_forward = 0.0002,
                  engine_force_backward = 0.0001,
                  turn_speed = 0.0005,
-                 drift_speed_detection = 1e-1):
+                 drift_speed_detection = 8e-3):
         super().__init__()
 
         self.position = position
@@ -117,10 +117,10 @@ class Car(object):
         #NOTE: y-axis has inverted screen coordinates
         velocity_bearing = (math.acos(x / speed)) * (-1 if (y >= 0) else 1) % (2*math.pi)
 
-        #Calculate drift angle with sign needed
+        #Calculate drift angle
         drift_angle = (velocity_bearing - self.bearing) % (2 * math.pi)
         drift_angle += -2*math.pi if drift_angle > math.pi else 0
 
 
-        #Return angle between velocity and agent front
-        return drift_angle
+        #Return angle (without sign) between velocity and agent front
+        return abs(drift_angle)

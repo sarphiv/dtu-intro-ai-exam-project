@@ -50,7 +50,9 @@ def draw_checkpoint(surface, coordinates, zoomer):
                   checkpoint_thickness)
 
 def draw_sensors(surface, state, sensors, car_position, zoomer):
-    points = (sensors[:, 1] - car_position) * state[:len(sensors)].reshape(-1, 1) + car_position
+    rays = (sensors[:, 1] - car_position)
+    unit_rays = rays / np.linalg.norm(rays, axis=1).reshape(-1, 1)
+    points = unit_rays * state[:len(sensors)].reshape(-1, 1) + car_position
     
     #Draw sensor lines
     for point in points:
