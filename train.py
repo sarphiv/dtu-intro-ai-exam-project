@@ -7,149 +7,178 @@ from datetime import datetime
 import torch as T
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 from concurrent.futures import ProcessPoolExecutor
+import copy
 
-from setup import create_simulator, create_agent, time_step, randomize_map, policy_path, freeze_snapshot_path, plot_data_path, plot_x_axis, plot_y_axis
+from environment.map import map_amount
+from setup import create_policies, create_simulator, create_agent, time_step, randomize_map, policy_path, freeze_snapshot_folder, freeze_snapshot_file, epochs_per_freeze_snapshot, epoch_elite, epoch_training_iterations, epoch_training_data, epoch_offspring_per_elite, plot_data_path, plot_x_axis, plot_y_axis
 
 
-
-worker_episode_batch = 1
-worker_procceses = 1
-episodes_per_freeze_snapshot = 64
+#Simulation progress bar approximate length
 simulation_bar_length = 64
 
 
-def play_episodes(progress_blocks):
-    #Disable gradients for performancne
-    T.no_grad()
+def play_episodes_caller(params):
+    return play_episodes(*params)
 
-    #Create agent to play game
-    agent = create_agent()
-
+def play_episodes(policy, map_sequence, progress_blocks):
     #Keep track of progress bar state
     prev_progress_block = 0
 
+    #Keep track of episode rewards
+    episode_rewards = []
 
-    #Saving episode trajectories (list of lists)
-    batch_states = []
-    batch_actions = []
-    batch_rewards = []
 
+    #Create agent to play game
+    agent = create_agent(policy)
     #Create simulator
     sim, state = create_simulator()
-    
-
-    for i in range(worker_episode_batch):
-        done = False
-
-        #Reset episode memory
-        episode_states = []
-        episode_actions = []
-        episode_rewards = []
+    #Create map sequence iterator
+    map_data = iter(zip(*map_sequence))
 
 
-        while not done:
-            #Get next action
-            action = agent.action(state)
-
-            #Simulate time step
-            state, reward, done = sim.step(time_step, action)
-            
-            #Save rewards
-            episode_states.append(state)
-            episode_actions.append(action)
-            episode_rewards.append(reward)
+    #Train agent x number of times based on y episodes
+    for i in range(epoch_training_iterations):
+        #Disable gradients for performancne
+        T.no_grad()
 
 
-        #Save episode
-        batch_states.append(episode_states)
-        batch_actions.append(episode_actions)
-        batch_rewards.append(episode_rewards)
+        #Simulate episodes between training
+        for e in range(epoch_training_data):
+            #Saving episode trajectories
+            states = []
+            actions = []
+            rewards = []
+
+            done = False
+
+            #Reset simulation and go to next map
+            sim.reset(*next(map_data))
 
 
-        #Reset simulator
-        state = sim.reset() if randomize_map else sim.reset(sim.map_id, sim.map_direction)
+            #Play episode till completion
+            while not done:
+                #Get next action
+                action = agent.action(state)
+
+                #Simulate time step
+                state, reward, done = sim.step(time_step, action)
+                
+                #Save rewards
+                states.append(state)
+                actions.append(action)
+                rewards.append(reward)
 
 
-        #Update progress bar
-        if int((i+1) / worker_episode_batch * progress_blocks) != prev_progress_block:
-            print('=', end='', flush=True)
-            prev_progress_block += 1
+            #Save episode
+            agent.save_episode(states, actions, rewards)
+            #Save episode reward
+            episode_rewards.append(np.array(rewards).sum())
+
+            #Update progress bar
+            progress = (i*epoch_training_data + e + 1) / (epoch_training_iterations * epoch_training_data)
+            if int(progress * progress_blocks) != prev_progress_block:
+                print('=', end='', flush=True)
+                prev_progress_block += 1
 
 
-    #Return episodes once done
-    return batch_states, batch_actions, batch_rewards
+        #Reenable gradients for training
+        T.enable_grad()
+
+        #Train agent
+        agent.train()
+
+
+    #Return trained policy, and mean episode reward
+    return policy, np.array(episode_rewards).mean()
 
 
 def train():
-    #Create agent to train
-    agent = create_agent()
-    
     #Create simulation counters
-    episode_counter = 0
+    epoch_counter = 0
     last_save_point = 0
     
     #Create simulation data file
     plot_file = CsvManager([plot_x_axis, plot_y_axis], file_name=plot_data_path, clear=False)
+    
+    #Get random number generator
+    rng = np.random.default_rng()
+
+    #Store elite policies
+    elites = create_policies()
 
 
     #Training loop
     while True:
         #Simulate episodes in parallel
         print("SIMULATING ", end='', flush=True)
-        T.no_grad()
-        with ProcessPoolExecutor() as executor:
-            batches = executor.map(play_episodes, [simulation_bar_length // worker_procceses] * worker_procceses)
 
+        #Generate map sequence
+        map_sequence_length = epoch_training_iterations*epoch_training_data
+        #If map should be randomized, get randomized sequence
+        if randomize_map:
+            map_sequence = (rng.integers(0, map_amount, size=map_sequence_length), 
+                            rng.choice([True, False], map_sequence_length))
+        #Else, return constant map sequence
+        else:
+            map_sequence = (np.array([0] * map_sequence_length),
+                            np.array([True] * map_sequence_length))
+
+
+        #Calculate amount of progress bar blocks each simulation gets
+        simulation_bar_blocks = simulation_bar_length / (epoch_elite * epoch_offspring_per_elite)
+
+
+        #Make arguments for each simulation
+        arguments = []
+        for policy in elites:
+            for _ in range(epoch_offspring_per_elite):
+                arguments.append([copy.deepcopy(policy), map_sequence, simulation_bar_blocks])
+
+
+        #Start simulations
+        with ProcessPoolExecutor() as executor:
+            simulation_batches = executor.map(play_episodes_caller, arguments)
 
         #Merge episode data
-        print("> COLLECTING BATCHES", flush=True)
-        #Storage for summed reward
-        summed_rewards = []
-        
-        #Iterate through each worker batch
-        for batch in batches:
-            #Get episodes from each batch
-            batch_states, batch_actions, batch_rewards = batch
-            
-            #Iterate through each episode
-            for states, actions, rewards in zip(batch_states, batch_actions, batch_rewards):
-                agent.save_episode(states, actions, rewards)
+        print("> PROCESSING RESULTS", flush=True)
+        simulation_batches = list(simulation_batches)
 
-                #Store mean reward
-                summed_rewards.append(np.array(rewards).sum())
+        #Sort simulations by elites first
+        simulation_batches.sort(key=lambda b: b[1], reverse=True)
+
+        #Store elites
+        elites = [e for e, _ in simulation_batches[:epoch_elite]]
 
 
         #Update game counter
-        episode_counter += worker_procceses * worker_episode_batch
-
-        #Print and save mean summed reward
-        summed_mean = np.array(summed_rewards).mean()
-
-        print(f"{episode_counter}: {summed_mean}", end='', flush=True)
-        plot_file.save_data([episode_counter, summed_mean])
+        epoch_counter += 1
 
 
-        #Initiate training
-        print(" ==> TRAINING", end='', flush=True)
-        T.enable_grad()
+        #Print and save best mean reward
+        best_mean_reward = simulation_batches[0][1]
 
-        agent.train()
-
-
-        #Save current agent
-        T.save(agent.policy, policy_path)
+        print(f"{epoch_counter}: {best_mean_reward}", end='', flush=True)
+        plot_file.save_data([epoch_counter, best_mean_reward])
 
 
-        #If save checkpoint reached, store snapshot of current agent
-        if episode_counter - last_save_point >= episodes_per_freeze_snapshot:
+        #Save snapshot of elites
+        for i, policy in enumerate(elites):
+            T.save(policy, policy_path.format(i))
+
+
+        #If save checkpoint reached, store frozen snapshot of current elites
+        if epoch_counter - last_save_point >= epochs_per_freeze_snapshot:
             #Reset save checkpoint counter
-            last_save_point = episode_counter
+            last_save_point = epoch_counter
             
             #Prepare timestamp string
             timestamp = datetime.utcnow().isoformat().replace(':', '-')
-
-            #Save snapshot
-            T.save(agent.policy, freeze_snapshot_path.format(timestamp, episode_counter, summed_mean))
+            
+            #Save snapshot of elites
+            freeze_folder = freeze_snapshot_folder.format(timestamp, epoch_counter)
+            os.mkdir(freeze_folder)
+            for i, (policy, mean_reward) in enumerate(simulation_batches[:epoch_elite]):
+                T.save(policy, freeze_folder + freeze_snapshot_file.format(i, mean_reward))
 
 
         #Print finish status message

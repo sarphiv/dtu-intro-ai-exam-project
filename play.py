@@ -9,7 +9,7 @@ import torch as T
 
 from game.keyboard_controller import create_keyboard_controller, wasd_control_scheme, dvorak_wasd_control_scheme
 from game.drawers import draw_game
-from setup import create_simulator, create_agent, map_size, time_step, randomize_map
+from setup import create_policies, create_policy, create_simulator, create_agent, map_size, time_step, randomize_map
 
 
 
@@ -38,8 +38,10 @@ time_delta = time_step
 pg_events = None
 
 
+#Create simulation
 sim, state = create_simulator()
-agent = create_agent()
+#Load best agent
+agent = create_agent(create_policy(0))
 
 # controller = create_keyboard_controller(lambda: pg_events, wasd_control_scheme)
 # controller = create_keyboard_controller(lambda: pg_events, dvorak_wasd_control_scheme)
@@ -108,7 +110,7 @@ while running:
         # Can happen if file is being updated.
         while True:
             try:
-                agent = create_agent()
+                agent = create_agent(create_policy(0))
                 break
             except:
                 print("Failed while loading agent")

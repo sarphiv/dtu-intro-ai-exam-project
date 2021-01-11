@@ -10,9 +10,17 @@ from ai.policy_gradient.Reinforce import Reinforce
 
 
 
-#Path to policies
-policy_path = "policy-snapshots/current-policy.pth"
-freeze_snapshot_path = "policy-snapshots/D{}-E{}-P{}-policy.pth"
+#Policy related options
+policy_path = "policy-snapshots/R{}-policy.pth"
+freeze_snapshot_folder = "policy-snapshots/D{}-E{}/"
+freeze_snapshot_file = "R{}-P{}-policy.pth"
+epochs_per_freeze_snapshot = 1
+
+epoch_training_iterations = 4
+epoch_training_data = 6
+epoch_training_replay = 3
+epoch_offspring_per_elite = 3
+epoch_elite = 5
 
 #Plot related options
 plot_data_path = "plot-data/current-plot.csv"
@@ -48,17 +56,23 @@ def create_simulator():
     return sim, state
 
 
-#Create agent
-def create_agent():
+def create_policy(id):
+    path = policy_path.format(id)
+
     #If pre-trained policy exists, load it
-    if os.path.isfile(policy_path):
-        policy = T.load(policy_path)
+    if os.path.isfile(path):
+        return T.load(path)
     #Else create new policy
     else:
-        policy = Reinforce([9, 32, 32, 7], policy_device) #NOTE: Not allowing turning on the spot
+        return Reinforce([9, 32, 32, 7], policy_device)
 
-    #Return agent with policy
-    return Agent(policy, learning_rate=1e-3,
+def create_policies():
+    #Attempt to load or create each elite policy
+    return [create_policy(i) for i in range(epoch_elite)]
+
+#Create agent
+def create_agent(policy):
+    return Agent(policy, learning_rate=6e-4,
                  future_discount=0.997,
-                 games_avg_store=2, games_avg_replay=1,
-                 replay_buffer_size=1920000, replay_batch_size=9000)
+                 games_avg_store=epoch_training_data, games_avg_replay=epoch_training_replay,
+                 replay_buffer_size=256000, replay_batch_size=9000)
