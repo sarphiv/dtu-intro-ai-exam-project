@@ -16,11 +16,14 @@ freeze_snapshot_folder = "policy-snapshots/D{}-E{}/"
 freeze_snapshot_file = "R{}-P{}-policy.pth"
 epochs_per_freeze_snapshot = 1
 
-epoch_training_iterations = 4
-epoch_training_data = 6
+epoch_training_iterations = 2
+epoch_training_data = 5
 epoch_training_replay = 3
-epoch_offspring_per_elite = 3
-epoch_elite = 5
+epoch_evaluation = 2
+epoch_offspring_per_elite = 4
+epoch_elite = 8
+
+simulation_max_time = 28800
 
 #Plot related options
 plot_data_path = "plot-data/current-plot.csv"
@@ -38,18 +41,20 @@ map_size = np.array([1600, 900])
 
 
 #Create environment
-def create_simulator():
+def create_simulator(map_id=None, map_direction=None):
     sim = Simulator(map_size=map_size, 
                     map_front_segments=4, 
                     map_back_segments=1,
                     checkpoint_reward=2000, 
                     lose_reward=-10000,
                     speed_reward=6,
-                    simulation_max_time=28800, 
+                    simulation_max_time=simulation_max_time, 
                     checkpoint_max_time=1800,
                     agent_size=np.array([10, 5]), 
-                    agent_sensor_angles=[0, math.pi/22, -math.pi/22, math.pi/5, -math.pi/5, math.pi*6/14, -math.pi*6/14],
-                    agent_sensor_lengths=[220, 200, 200, 160, 160, 100, 100])
+                    agent_sensor_angles=[0, math.pi/8, -math.pi/8, math.pi/5, -math.pi/5, math.pi*6/14, -math.pi*6/14],
+                    agent_sensor_lengths=[220, 180, 180, 160, 160, 140, 140],
+                    map_id=map_id,
+                    map_direction=map_direction)
 
     state = sim.get_state()
 
@@ -75,4 +80,4 @@ def create_agent(policy):
     return Agent(policy, learning_rate=6e-4,
                  future_discount=0.997,
                  games_avg_store=epoch_training_data, games_avg_replay=epoch_training_replay,
-                 replay_buffer_size=256000, replay_batch_size=9000)
+                 replay_buffer_size=simulation_max_time*epoch_training_data, replay_batch_size=9000)

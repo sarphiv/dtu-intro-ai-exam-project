@@ -20,7 +20,8 @@ class Simulator(object):
                  map_size, map_front_segments, map_back_segments,
                  checkpoint_reward, lose_reward, speed_reward,
                  simulation_max_time, checkpoint_max_time,
-                 agent_size, agent_sensor_angles, agent_sensor_lengths):
+                 agent_size, agent_sensor_angles, agent_sensor_lengths,
+                 map_id=None, map_direction=None):
         super().__init__()
 
         #Define random number generator
@@ -49,7 +50,7 @@ class Simulator(object):
 
 
         #Initailize environment
-        self.reset()
+        self.reset(map_id, map_direction)
 
 
     def reset(self, map_id=None, map_direction=None):
