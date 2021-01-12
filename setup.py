@@ -16,12 +16,12 @@ freeze_snapshot_folder = "policy-snapshots/D{}-E{}/"
 freeze_snapshot_file = "R{}-P{}-policy.pth"
 epochs_per_freeze_snapshot = 1
 
-epoch_training_iterations = 2
+epoch_training_iterations = 4
 epoch_training_data = 5
 epoch_training_replay = 3
 epoch_evaluation = 2
 epoch_offspring_per_elite = 4
-epoch_elite = 8
+epoch_elite = 12
 
 simulation_max_time = 28800
 
@@ -51,8 +51,8 @@ def create_simulator(map_id=None, map_direction=None):
                     simulation_max_time=simulation_max_time, 
                     checkpoint_max_time=1800,
                     agent_size=np.array([10, 5]), 
-                    agent_sensor_angles=[0, math.pi/8, -math.pi/8, math.pi/5, -math.pi/5, math.pi*6/14, -math.pi*6/14],
-                    agent_sensor_lengths=[220, 180, 180, 160, 160, 140, 140],
+                    agent_sensor_angles=[0, math.pi/16, -math.pi/16, math.pi/8, -math.pi/8, math.pi/5, -math.pi/5, math.pi*6/14, -math.pi*6/14],
+                    agent_sensor_lengths=[220, 180, 180, 180, 180, 160, 160, 140, 140],
                     map_id=map_id,
                     map_direction=map_direction)
 
@@ -69,7 +69,7 @@ def create_policy(id):
         return T.load(path)
     #Else create new policy
     else:
-        return Reinforce([9, 32, 32, 7], policy_device)
+        return Reinforce([11, 128, 64, 7], policy_device)
 
 def create_policies():
     #Attempt to load or create each elite policy
