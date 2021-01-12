@@ -6,8 +6,8 @@ import numpy as np
 
 class Rocket(pygame.sprite.Sprite):
     # Rocket images    
-    filenames = ['rocket0.png', 'rocket1.png', 'rocket0l.png', 'rocket1l.png', 
-                 'rocket0r.png', 'rocket1r.png', 'rocket0lr.png', 'rocket1lr.png']
+    filenames = ['pictures/rocket0.png', 'pictures/rocket1.png', 'pictures/rocket0l.png', 'pictures/rocket1l.png', 
+                 'pictures/rocket0r.png', 'pictures/rocket1r.png', 'pictures/rocket0lr.png', 'pictures/rocket1lr.png']
     rocketImages = [pygame.image.load(file) for file in filenames]
     
     # Dimensions of rocket
