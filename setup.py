@@ -23,6 +23,8 @@ epoch_evaluation = 2
 epoch_offspring_per_elite = 4
 epoch_elite = 12
 
+max_generations = 4
+
 simulation_max_time = 28800
 
 #Plot related options

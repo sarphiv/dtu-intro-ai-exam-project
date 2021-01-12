@@ -10,8 +10,12 @@ from concurrent.futures import ProcessPoolExecutor
 import copy
 
 from environment.map import map_amount
-from setup import create_policies, create_simulator, create_agent, time_step, randomize_map, policy_path, freeze_snapshot_folder, freeze_snapshot_file, epochs_per_freeze_snapshot, epoch_elite, epoch_training_iterations, epoch_training_data, epoch_evaluation, epoch_offspring_per_elite, plot_data_path, plot_x_axis, plot_y_axis
+from setup import create_policies, create_simulator, create_agent, time_step, randomize_map, policy_path, freeze_snapshot_folder, freeze_snapshot_file, epochs_per_freeze_snapshot, epoch_elite, epoch_training_iterations, epoch_training_data, epoch_evaluation, epoch_offspring_per_elite, max_generations, plot_data_path, plot_x_axis, plot_y_axis
 
+
+
+NPROC_AGENTS = 4
+NPROC_MAPS = 4
 
 
 def create_map_sequence():
@@ -54,12 +58,15 @@ def simulate_map(agent, map_id, map_direction):
         #Get next action
         action = agent.action(state)
 
-        #Simulate time step
-        state, reward, done = sim.step(time_step, action)
-        
-        #Save rewards
+        #Save state and action
         states.append(state)
         actions.append(action)
+
+
+        #Simulate time step
+        state, reward, done = sim.step(time_step, action)
+
+        #Save rewards
         rewards.append(reward)
 
     #Return simulation results
@@ -67,11 +74,12 @@ def simulate_map(agent, map_id, map_direction):
 
 
 def simulate_maps(agent, map_sequence):
+    global NPROC_MAPS
     #Create simulation arguments for each map
     arguments = [[agent, map_id, map_direction] for map_id, map_direction in map_sequence]
 
     #Start simulations
-    with ProcessPoolExecutor() as executor:
+    with ProcessPoolExecutor(NPROC_MAPS) as executor:
         return executor.map(simulate_map_caller, arguments)
 
 
@@ -128,6 +136,8 @@ def train_agent(policy, map_sequence):
 
 
 def train():
+    global NPROC_AGENTS
+
     #Create simulation counters
     epoch_counter = 0
     last_save_point = 0
@@ -141,7 +151,7 @@ def train():
 
 
     #Training loop
-    while True:
+    while epoch_counter < max_generations:
         #Simulate episodes in parallel
         print("SIMULATING ", end='', flush=True)
 
@@ -155,7 +165,7 @@ def train():
                 arguments.append([copy.deepcopy(policy), map_sequence])
 
         #Start simulations
-        with ProcessPoolExecutor() as executor:
+        with ProcessPoolExecutor(NPROC_AGENTS) as executor:
             simulation_batches = executor.map(train_agent_caller, arguments)
             simulation_batches = list(simulation_batches)
 
