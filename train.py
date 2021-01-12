@@ -7,10 +7,12 @@ from datetime import datetime
 import torch as T
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 from concurrent.futures import ProcessPoolExecutor
+from game.action_space import index_to_action
 import copy
+from environment.LunarLanderSim import LunarLander
 
-from environment.map import map_amount
-from setup import create_policies, create_simulator, create_agent, time_step, randomize_map, policy_path, freeze_snapshot_folder, freeze_snapshot_file, epochs_per_freeze_snapshot, epoch_elite, epoch_training_iterations, epoch_training_data, epoch_evaluation, epoch_offspring_per_elite, max_generations, plot_data_path, plot_x_axis, plot_y_axis
+from setup import create_policies, create_agent, randomize_map, reward_factors, policy_path, freeze_snapshot_folder, freeze_snapshot_file, action_interval, epochs_per_freeze_snapshot, epoch_elite, epoch_training_iterations, epoch_training_data, epoch_evaluation, epoch_offspring_per_elite, max_generations, plot_data_path, plot_x_axis, plot_y_axis
+
 
 
 
@@ -18,7 +20,7 @@ NPROC_AGENTS = 4
 NPROC_MAPS = 4
 
 
-def create_map_sequence():
+def create_start_sequence():
     #Get random number generator
     rng = np.random.default_rng()
     
@@ -27,23 +29,23 @@ def create_map_sequence():
 
     #If map should be randomized, get randomized sequence
     if randomize_map:
-        return (rng.integers(0, map_amount, size=map_sequence_length), 
-                rng.choice([True, False], map_sequence_length))
+        return [(300*(rng.uniform()*2-1), 3*(rng.uniform()*2-1), 3*(rng.uniform()*2-1)) for i in range(map_sequence_length)]
     #Else, return constant map sequence
     else:
-        return (np.array([0] * map_sequence_length),
-                np.array([True] * map_sequence_length))
+        return [(-50, 2, -1) for _ in range(map_sequence_length)]
 
 
 def simulate_map_caller(params):
     return simulate_map(*params)
 
-def simulate_map(agent, map_id, map_direction):
+def simulate_map(agent, start_state):
     #Disable gradients for performancne
     T.no_grad()
 
     #Create simulator
-    sim, state = create_simulator(map_id, map_direction)
+    env = LunarLander()
+    env.reset(start_state)
+    state = np.array(env.get_state())
     
     #Saving episode trajectories
     states = []
@@ -52,47 +54,66 @@ def simulate_map(agent, map_id, map_direction):
 
     #Game completion state
     done = False
-
+    
+    i = 0
+    
     #Play episode till completion
     while not done:
-        #Get next action
-        action = agent.action(state)
+        take_action = i % action_interval == 0
+        if take_action:
+            #Get next action
+            action_id = agent.action(state)
+            action = index_to_action(action_id)
 
-        #Save state and action
-        states.append(state)
-        actions.append(action)
-
+            #Save state and action
+            states.append(state)
+            actions.append(action_id)
 
         #Simulate time step
-        state, reward, done = sim.step(time_step, action)
+        (state, _, done) = env.step(action)
+        (x, y, xspeed, yspeed, fuel) = state
 
-        #Save rewards
-        rewards.append(reward)
+
+        #If not done save rewards
+        if not done and take_action:
+            rewards.append(0)
+            
+        i += 1
+
+
+    #Save terminal reward
+    pos_delta = max(abs(x) - 20, 0) # within winning range 
+    speed = (xspeed**2 + yspeed**2)**0.5 if not (xspeed**2 + yspeed**2)**0.5 - 20 < 0 else 0
+    fuel = env.rocket.fuel
+    won = env.won
+
+    reward = np.array([pos_delta**0.25, speed, fuel*won, won])
+    reward = (reward_factors * reward).sum()
+
+    rewards.append(reward)
+
 
     #Return simulation results
     return states, actions, rewards
 
 
-def simulate_maps(agent, map_sequence):
+def simulate_maps(agent, start_sequence):
     global NPROC_MAPS
     #Create simulation arguments for each map
-    arguments = [[agent, map_id, map_direction] for map_id, map_direction in map_sequence]
+    arguments = [[agent, start_state] for start_state in start_sequence]
 
     #Start simulations
-    with ProcessPoolExecutor(NPROC_MAPS) as executor:
-        return executor.map(simulate_map_caller, arguments)
+    return [simulate_map_caller(args) for args in arguments]
+    # with ProcessPoolExecutor(NPROC_MAPS) as executor:
+    #         return executor.map(simulate_map_caller, arguments)
 
 
 def train_agent_caller(params):
     return train_agent(*params)
 
-def train_agent(policy, map_sequence):
+def train_agent(policy, start_sequence):
     #Create agent to play game
     agent = create_agent(policy)
-
-    #Create map sequence
-    map_data = list(zip(*map_sequence))
-
 
     #Train agent for i training iterations with 'data' steps each time
     for i in range(0, epoch_training_iterations * epoch_training_data, epoch_training_data):
@@ -100,7 +121,7 @@ def train_agent(policy, map_sequence):
         T.no_grad()
 
         #Simulate subset of map sequence with agent
-        map_results = simulate_maps(agent, map_data[i:i + epoch_training_data])
+        map_results = simulate_maps(agent, start_sequence[i:i + epoch_training_data])
 
 
         #Save results
@@ -118,7 +139,7 @@ def train_agent(policy, map_sequence):
 
 
     #Simulate evaluation subset of maps
-    map_results = list(simulate_maps(agent, map_data[epoch_training_iterations * epoch_training_data:]))
+    map_results = list(simulate_maps(agent, start_sequence[epoch_training_iterations * epoch_training_data:]))
     
     #Calculate mean episode summed reward
     episode_rewards = 0
@@ -156,18 +177,19 @@ def train():
         print("SIMULATING ", end='', flush=True)
 
         #Generate map sequence
-        map_sequence = create_map_sequence()
+        start_sequence = create_start_sequence()
 
         #Make arguments for each simulation
         arguments = []
         for policy in elites:
             for _ in range(epoch_offspring_per_elite):
-                arguments.append([copy.deepcopy(policy), map_sequence])
+                arguments.append([copy.deepcopy(policy), start_sequence])
 
         #Start simulations
-        with ProcessPoolExecutor(NPROC_AGENTS) as executor:
-            simulation_batches = executor.map(train_agent_caller, arguments)
-            simulation_batches = list(simulation_batches)
+        simulation_batches = [train_agent_caller(args) for args in arguments]
+        # with ProcessPoolExecutor(NPROC_AGENTS) as executor:
+            # simulation_batches = executor.map(train_agent_caller, arguments)
+            # simulation_batches = list(simulation_batches)
 
 
         #Merge episode data

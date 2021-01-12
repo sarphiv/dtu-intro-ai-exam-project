@@ -4,7 +4,6 @@ import os
 import torch as T
 
 
-from environment.simulator import Simulator
 from ai.policy_gradient.Agent import Agent
 from ai.policy_gradient.Reinforce import Reinforce
 
@@ -14,16 +13,16 @@ from ai.policy_gradient.Reinforce import Reinforce
 policy_path = "policy-snapshots/R{}-policy.pth"
 freeze_snapshot_folder = "policy-snapshots/D{}-E{}/"
 freeze_snapshot_file = "R{}-P{}-policy.pth"
-epochs_per_freeze_snapshot = 1
+epochs_per_freeze_snapshot = 4
 
-epoch_training_iterations = 4
-epoch_training_data = 5
-epoch_training_replay = 3
+epoch_training_iterations = 2
+epoch_training_data = 32
+epoch_training_replay = 32
 epoch_evaluation = 2
-epoch_offspring_per_elite = 4
-epoch_elite = 12
+epoch_offspring_per_elite = 2
+epoch_elite = 6
 
-max_generations = 4
+max_generations = 100
 
 simulation_max_time = 28800
 
@@ -38,29 +37,9 @@ policy_device = "cpu"
 
 #Define parameters
 randomize_map = True
-time_step = 16 #Set to None, to use frame time
-map_size = np.array([1600, 900])
+reward_factors = np.array([-100, -60, 50, 2000]) 
+action_interval = 4
 
-
-#Create environment
-def create_simulator(map_id=None, map_direction=None):
-    sim = Simulator(map_size=map_size, 
-                    map_front_segments=4, 
-                    map_back_segments=1,
-                    checkpoint_reward=2000, 
-                    lose_reward=-10000,
-                    speed_reward=6,
-                    simulation_max_time=simulation_max_time, 
-                    checkpoint_max_time=1800,
-                    agent_size=np.array([10, 5]), 
-                    agent_sensor_angles=[0, math.pi/16, -math.pi/16, math.pi/8, -math.pi/8, math.pi/5, -math.pi/5, math.pi*6/14, -math.pi*6/14],
-                    agent_sensor_lengths=[220, 180, 180, 180, 180, 160, 160, 140, 140],
-                    map_id=map_id,
-                    map_direction=map_direction)
-
-    state = sim.get_state()
-
-    return sim, state
 
 
 def create_policy(id):
@@ -71,7 +50,7 @@ def create_policy(id):
         return T.load(path)
     #Else create new policy
     else:
-        return Reinforce([11, 128, 64, 7], policy_device)
+        return Reinforce([5, 64, 64, 6], policy_device)
 
 def create_policies():
     #Attempt to load or create each elite policy

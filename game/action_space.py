@@ -1,34 +1,25 @@
-action_to_id = {
-    (False, False, False, False): 0,
-    (False, False, False,  True): 0,#7,
-    (False, False,  True, False): 0,#8,
-    (False,  True, False, False): 4,
-    (False,  True, False,  True): 6,#Should be 5 for human controls
-    (False,  True,  True, False): 5,#Should be 6 for human controls
-    ( True, False, False, False): 1,
-    ( True, False, False,  True): 3,
-    ( True, False,  True, False): 2,
-    
-    
-    (False, False,  True,  True): 0,
-    ( True,  True, False, False): 0,
-    
-    ( True, False,  True,  True): 1,
-    (False,  True,  True,  True): 4,
-    
-    ( True, True,   True,  False): 0,#7,
-    ( True, True,   False,  True): 0,#8,
-}
+def action_to_index(boost, left, right):
+    #TODO: Fix this mess, I'm tired of things not working,
+    # SO THINGS JUST NEED TO WORK NOW
+    return {
+        (False, False, False): 0,
+        (False, True, True): 0,
+        (True, False, False): 1,
+        (True, True, True): 1,
+        (True, True, False): 2,
+        (True, False, True): 3,
+        (False, True, False): 4,
+        (False, False, True): 5,
+    }[boost, left, right]
 
-id_to_action = [
-    (False, False, False, False),
-    ( True, False, False, False),
-    ( True, False,  True, False),
-    ( True, False, False,  True),
-    (False,  True, False, False),
-    (False,  True,  True, False),
-    (False,  True, False,  True),
-
-    (False, False,  True, False),
-    (False, False, False,  True),
-]
+def index_to_action(index):
+    #TODO: Fix this mess, I'm tired of things not working,
+    # SO THINGS JUST NEED TO WORK NOW
+    return {
+        0: (False, False, False),
+        1: (True, False, False),
+        2: (True, True, False),
+        3: (True, False, True),
+        4: (False, True, False),
+        5: (False, False, True),
+    }[index]
