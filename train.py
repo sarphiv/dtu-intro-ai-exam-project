@@ -3,6 +3,7 @@ import numpy as np
 import random as r
 import math
 import os
+import shutil
 from datetime import datetime
 import torch as T
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
@@ -10,12 +11,12 @@ from concurrent.futures import ProcessPoolExecutor
 import copy
 
 from environment.map import map_amount
-from setup import create_policies, create_simulator, create_agent, time_step, randomize_map, policy_path, freeze_snapshot_folder, freeze_snapshot_file, epochs_per_freeze_snapshot, epoch_elite, epoch_training_iterations, epoch_training_data, epoch_evaluation, epoch_offspring_per_elite, max_generations, plot_data_path, plot_x_axis, plot_y_axis
+from setup import create_policies, create_simulator, create_agent, time_step, randomize_map, state_path, policy_folder, policy_path, freeze_snapshot_folder, freeze_snapshot_file, epochs_per_freeze_snapshot, epoch_elite, epoch_training_iterations, epoch_training_data, epoch_evaluation, epoch_offspring_per_elite, max_parallelism, max_generations, plot_data_path, plot_x_axis, plot_y_axis
 
 
 
-NPROC_AGENTS = 4
-NPROC_MAPS = 4
+processes_maps = max(int(0.1 * max_parallelism), 1)
+processes_agents = max(max_parallelism // processes_maps, 1)
 
 
 def create_map_sequence():
@@ -28,7 +29,7 @@ def create_map_sequence():
     #If map should be randomized, get randomized sequence
     if randomize_map:
         return (rng.integers(0, map_amount, size=map_sequence_length), 
-                rng.choice([True, False], map_sequence_length))
+                rng.choice([True, False], size=map_sequence_length))
     #Else, return constant map sequence
     else:
         return (np.array([0] * map_sequence_length),
@@ -74,12 +75,11 @@ def simulate_map(agent, map_id, map_direction):
 
 
 def simulate_maps(agent, map_sequence):
-    global NPROC_MAPS
     #Create simulation arguments for each map
     arguments = [[agent, map_id, map_direction] for map_id, map_direction in map_sequence]
 
     #Start simulations
-    with ProcessPoolExecutor(NPROC_MAPS) as executor:
+    with ProcessPoolExecutor(processes_maps) as executor:
         return executor.map(simulate_map_caller, arguments)
 
 
@@ -136,14 +136,29 @@ def train_agent(policy, map_sequence):
 
 
 def train():
-    global NPROC_AGENTS
-
     #Create simulation counters
-    epoch_counter = 0
-    last_save_point = 0
-    
-    #Create simulation data file
-    plot_file = CsvManager([plot_x_axis, plot_y_axis], file_name=plot_data_path, clear=False)
+    #If resuming, continue simulation
+    if os.path.isfile(state_path):
+        with open(state_path, 'r') as file:
+            epoch_counter = int(file.readline())
+            last_save_point = int(file.readline())
+
+        #Load simulation data file
+        plot_file = CsvManager([plot_x_axis, plot_y_axis], file_name=plot_data_path, clear=False)
+
+    #Else, start simulation from nothing
+    else:
+        shutil.rmtree(policy_folder, ignore_errors=True)
+        os.mkdir(policy_folder)
+
+        if os.path.exists(plot_data_path):
+            os.remove(plot_data_path)
+
+        epoch_counter = 0
+        last_save_point = 0
+
+        #Create simulation data file
+        plot_file = CsvManager([plot_x_axis, plot_y_axis], file_name=plot_data_path, clear=True)
 
 
     #Store elite policies
@@ -165,7 +180,7 @@ def train():
                 arguments.append([copy.deepcopy(policy), map_sequence])
 
         #Start simulations
-        with ProcessPoolExecutor(NPROC_AGENTS) as executor:
+        with ProcessPoolExecutor(processes_agents) as executor:
             simulation_batches = executor.map(train_agent_caller, arguments)
             simulation_batches = list(simulation_batches)
 
@@ -208,6 +223,10 @@ def train():
             os.mkdir(freeze_folder)
             for i, (policy, mean_reward) in enumerate(simulation_batches[:epoch_elite]):
                 T.save(policy, freeze_folder + freeze_snapshot_file.format(i, mean_reward))
+
+
+        with open(state_path, 'w') as file:
+            file.writelines([f"{epoch_counter}\n", f"{last_save_point}\n"])
 
 
         #Print finish status message

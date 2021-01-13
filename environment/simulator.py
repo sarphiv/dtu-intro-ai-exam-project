@@ -221,7 +221,7 @@ class Simulator(object):
         ray_lines = self.get_sensor_lines(rays)
         
         #Prepare state array
-        state = np.zeros(len(ray_lines) + 2)
+        state = np.zeros(len(ray_lines) + 1)
         
         #Iterate through each ray
         for i, ray in enumerate(ray_lines):
@@ -246,8 +246,7 @@ class Simulator(object):
                 state[i] = np.linalg.norm(rays[i, 1] - self.car.position)
 
 
-        #Store agent velocity angle relative to agent front, and agent speed
-        state[-2] = self.car.get_drift_angle()
+        #Store agent speed
         state[-1] = np.linalg.norm(self.car.velocity)
 
         #Return final state
@@ -274,8 +273,8 @@ class Simulator(object):
         state = self.get_state(window_line)
         
         #Update time
-        self.checkpoint_time_counter += 1
-        self.simulation_time_counter += 1
+        self.checkpoint_time_counter += time_delta / 16
+        self.simulation_time_counter += time_delta / 16
 
         
         #Give speed reward
