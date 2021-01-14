@@ -19,14 +19,16 @@ running = True
 restart = False
 
 zoomed = True
-zoom_in_scale = 6.0
+zoom_in_scale = 8.0
 zoom_out_scale = 1.0
 zoom_scale_target = zoom_in_scale
 zoom_scale = zoom_out_scale
 zoom_pos_target = None #Defaults to car
 zoom_pos = map_size / 2
-zoom_scale_speed = 0.08
-zoom_pos_speed = 0.07
+zoom_scale_speed = 0.02
+zoom_pos_speed = 0.02
+zoom_pos_vel_factor = 3000
+zoom_scale_vel_factor = -70
 
 
 pg.init()
@@ -59,8 +61,8 @@ def handle_events():
     global zoom_pos
     
     #Set zoom
-    zoom_pos_target = sim.car.position if zoomed else map_size / 2
-    zoom_scale_target = zoom_in_scale if zoomed else zoom_out_scale
+    zoom_pos_target = sim.car.position + sim.car.velocity * zoom_pos_vel_factor if zoomed else map_size / 2
+    zoom_scale_target = zoom_in_scale + np.linalg.norm(sim.car.velocity) * zoom_scale_vel_factor if zoomed else zoom_out_scale
 
     zoom_scale += (zoom_scale_target - zoom_scale) * zoom_scale_speed
     zoom_pos += (zoom_pos_target - zoom_pos) * zoom_pos_speed
