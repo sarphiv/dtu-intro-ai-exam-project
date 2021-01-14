@@ -26,13 +26,14 @@ epoch_evaluation = 3
 epoch_offspring_per_elite = 4
 epoch_elite = 12
 
-max_parallelism = 32
-max_generations = 100
+max_parallelism = 28
+max_generations = 150
 
 simulation_max_time = 28800
 
 #Plot related options
-plot_data_path = "plot-data/current-plot.csv"
+plot_data_folder = "plot-data/"
+plot_data_path = plot_data_folder + "current-plot.csv"
 plot_x_axis = "Generations simulated"
 plot_y_axis = "Best elite mean reward"
 

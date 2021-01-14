@@ -11,7 +11,7 @@ from concurrent.futures import ProcessPoolExecutor
 import copy
 
 from environment.map import map_amount
-from setup import create_policies, create_simulator, create_agent, time_step, randomize_map, state_path, policy_folder, policy_path, freeze_snapshot_folder, freeze_snapshot_file, epochs_per_freeze_snapshot, epoch_elite, epoch_training_iterations, epoch_training_data, epoch_evaluation, epoch_offspring_per_elite, max_parallelism, max_generations, plot_data_path, plot_x_axis, plot_y_axis
+from setup import create_policies, create_simulator, create_agent, time_step, randomize_map, state_path, policy_folder, policy_path, freeze_snapshot_folder, freeze_snapshot_file, epochs_per_freeze_snapshot, epoch_elite, epoch_training_iterations, epoch_training_data, epoch_evaluation, epoch_offspring_per_elite, max_parallelism, max_generations, plot_data_folder, plot_data_path, plot_x_axis, plot_y_axis
 
 
 
@@ -151,8 +151,8 @@ def train():
         shutil.rmtree(policy_folder, ignore_errors=True)
         os.mkdir(policy_folder)
 
-        if os.path.exists(plot_data_path):
-            os.remove(plot_data_path)
+        shutil.rmtree(plot_data_folder, ignore_errors=True)
+        os.mkdir(plot_data_folder)
 
         epoch_counter = 0
         last_save_point = 0
