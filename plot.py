@@ -8,7 +8,7 @@ import time
 
 
 #Load current plot file
-plot_file = CsvManager([plot_x_axis, plot_y_axis], file_name=plot_data_path, clear=False)
+plot_file = CsvManager([plot_x_axis, plot_y_axis], file_name=plot_data_path.format(0), clear=False)
 
 #NOTE: Can add more plot files to plot them together
 plots = PlotManager([plot_file])

@@ -15,15 +15,15 @@ state_path = "state.txt"
 #Policy related options
 policy_folder = "policy-snapshots/"
 policy_path = policy_folder + "I{}-policy.pth"
-freeze_snapshot_path = policy_folder + "policy-snapshots/D{}-E{}-I{}-P{}-policy.pth"
-episodes_per_freeze_snapshot = 720 #Equal to episodes in a generation
+freeze_snapshot_path = policy_folder + "D{}-E{}-I{}-P{}-policy.pth"
+episodes_per_freeze_snapshot = 45 #Equal to 16x episodes in a generation
 
-num_agents = 30
+num_agents = 8
 
 episode_training_data = 4
 episode_training_replay = 3
 
-max_parallelism = 32
+max_parallelism = 12
 max_episodes = 108000 #Equal to 150 generations
 
 simulation_max_time = 28800
@@ -31,7 +31,7 @@ simulation_max_time = 28800
 #Plot related options
 plot_data_folder = "plot-data/"
 plot_data_path = plot_data_folder + "current-plot-I{}.csv" 
-plot_x_axis = "Generations simulated"
+plot_x_axis = "Episodes simulated"
 plot_y_axis = "Best elite mean reward"
 
 #Policy training device

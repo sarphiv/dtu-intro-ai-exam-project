@@ -9,7 +9,7 @@ import torch as T
 
 from game.keyboard_controller import create_keyboard_controller, wasd_control_scheme, dvorak_wasd_control_scheme
 from game.drawers import draw_game
-from setup import create_policies, create_policy, create_simulator, create_agent, map_size, time_step, randomize_map
+from setup import create_policy, create_simulator, create_agent, map_size, time_step, randomize_map
 
 
 
