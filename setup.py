@@ -14,26 +14,23 @@ state_path = "state.txt"
 
 #Policy related options
 policy_folder = "policy-snapshots/"
-policy_path = policy_folder + "R{}-policy.pth"
-freeze_snapshot_folder = policy_folder + "D{}-E{}/"
-freeze_snapshot_file = "R{}-P{}-policy.pth"
-epochs_per_freeze_snapshot = 1
+policy_path = policy_folder + "I{}-policy.pth"
+freeze_snapshot_path = policy_folder + "policy-snapshots/D{}-E{}-I{}-P{}-policy.pth"
+episodes_per_freeze_snapshot = 720 #Equal to episodes in a generation
 
-epoch_training_iterations = 3
-epoch_training_data = 4
-epoch_training_replay = 3
-epoch_evaluation = 3
-epoch_offspring_per_elite = 4
-epoch_elite = 12
+num_agents = 30
 
-max_parallelism = 28
-max_generations = 150
+episode_training_data = 4
+episode_training_replay = 3
+
+max_parallelism = 32
+max_episodes = 108000 #Equal to 150 generations
 
 simulation_max_time = 28800
 
 #Plot related options
 plot_data_folder = "plot-data/"
-plot_data_path = plot_data_folder + "current-plot.csv"
+plot_data_path = plot_data_folder + "current-plot-I{}.csv" 
 plot_x_axis = "Generations simulated"
 plot_y_axis = "Best elite mean reward"
 
@@ -79,13 +76,9 @@ def create_policy(id):
     else:
         return Reinforce([10, 128, 64, 7], policy_device)
 
-def create_policies():
-    #Attempt to load or create each elite policy
-    return [create_policy(i) for i in range(epoch_elite)]
-
 #Create agent
 def create_agent(policy):
     return Agent(policy, learning_rate=6e-4,
                  future_discount=0.997,
-                 games_avg_store=epoch_training_data, games_avg_replay=epoch_training_replay,
-                 replay_buffer_size=simulation_max_time*epoch_training_data, replay_batch_size=9000)
+                 games_avg_store=episode_training_data, games_avg_replay=episode_training_replay,
+                 replay_buffer_size=simulation_max_time*episode_training_data, replay_batch_size=9000)

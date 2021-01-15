@@ -6,7 +6,7 @@
 #BSUB -J self-driving-car-reinforce
 
 ### Cores to request
-#BSUB -n 28
+#BSUB -n 32
 
 ### Force cores to be on same host
 #BSUB -R "span[hosts=1]" 
