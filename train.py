@@ -16,8 +16,8 @@ from setup import create_policies, create_agent, randomize_map, reward_factors, 
 
 
 
-NPROC_AGENTS = 4
-NPROC_MAPS = 4
+NPROC_AGENTS = 12
+NPROC_MAPS = 1
 
 
 def create_start_sequence():
@@ -170,9 +170,10 @@ def train():
     #Store elite policies
     elites = create_policies()
 
-
+    best_mean_reward = - 20000
+    
     #Training loop
-    while epoch_counter < max_generations:
+    while epoch_counter < max_generations:  #and best_mean_reward < 6000:
         #Simulate episodes in parallel
         print("SIMULATING ", end='', flush=True)
 
