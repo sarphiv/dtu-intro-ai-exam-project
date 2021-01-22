@@ -44,7 +44,7 @@ policy_device = "cpu"
 #Define parameters
 randomize_map = True
 #NOTE: Physics is tuned for 16 ms. Higher time step to generalize training.
-time_step = 64 #Set to None, to use frame time.
+time_step = 16 #Set to None, to use frame time.
 map_size = np.array([1600, 900])
 
 
