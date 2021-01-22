@@ -1,89 +1,238 @@
+from plotting.CsvManager import CsvManager
 import numpy as np
 import random as r
+import math
+import os
+import shutil
+from datetime import datetime
+import torch as T
+os.environ['KMP_DUPLICATE_LIB_OK']='True'
+from concurrent.futures import ProcessPoolExecutor
+import copy
 
-from environment.map import create_empty_map, create_middle_obstacle, create_spawns
-from environment.agent import Agent
-from environment.simulator import Simulator
-from ai.predictive_seeker import create_predictive_seeker_controller
-
-
-#Define distances
-time_step_range = (6, 19) #milliseconds
-map_size = (1600, 900)
-agent_start_edge_distance = 200
-agent_size = np.array([50, 20])
-agent_spawns = create_spawns(*map_size, agent_start_edge_distance)
+from environment.map import map_amount
+from setup import create_policies, create_simulator, create_agent, time_step, randomize_map, state_path, policy_folder, policy_path, freeze_snapshot_folder, freeze_snapshot_file, epochs_per_freeze_snapshot, epoch_elite, epoch_training_iterations, epoch_training_data, epoch_evaluation, epoch_offspring_per_elite, max_parallelism, max_generations, plot_data_folder, plot_data_path, plot_x_axis, plot_y_axis
 
 
-map = create_empty_map(*map_size)
-wall = create_middle_obstacle(*map_size)
+
+processes_maps = max(int(0.1 * max_parallelism), 1)
+processes_agents = max(max_parallelism // processes_maps, 1)
 
 
-#Helper function to create agents at specific positions and orientations
-def create_agents():
-    return [
-        Agent(*agent_spawns[0],
-               agent_size),
-        Agent(*agent_spawns[1],
-               agent_size),
-        Agent(*agent_spawns[3],
-               agent_size),
-        Agent(*agent_spawns[4],
-               agent_size),
-    ]
+def create_map_sequence():
+    #Get random number generator
+    rng = np.random.default_rng()
+    
+    #Calculate length of map sequence based on training + evaluation
+    map_sequence_length = epoch_training_iterations*epoch_training_data + epoch_evaluation
 
-#Helper function to create controllers for agents
-def create_controllers():
-    return [
-        ##############################################################################################
-        #INSERT DEFINITION OF AI CONTROLLER
-        ##############################################################################################
-        create_predictive_seeker_controller(enemy_ids=range(2, 4)),
-        create_predictive_seeker_controller(enemy_ids=range(2, 4)),
-        create_predictive_seeker_controller(enemy_ids=range(0, 2)),
-        create_predictive_seeker_controller(enemy_ids=range(0, 2)),
-    ]
-
-#Helper function to create simulation with required parameters
-def create_simulation(agents, controllers):
-    return Simulator(agents, controllers, [*map, wall])
+    #If map should be randomized, get randomized sequence
+    if randomize_map:
+        return (rng.integers(0, map_amount, size=map_sequence_length), 
+                rng.choice([True, False], size=map_sequence_length))
+    #Else, return constant map sequence
+    else:
+        return (np.array([0] * map_sequence_length),
+                np.array([True] * map_sequence_length))
 
 
-#Create agents, controllers, and simulation
-agents = create_agents()
-controllers = create_controllers()
-sim = create_simulation(agents, controllers)
+def simulate_map_caller(params):
+    return simulate_map(*params)
 
-#NOTE: Uneven teams biases second team
-team_size = len(agents) // 2
+def simulate_map(agent, map_id, map_direction):
+    #Disable gradients for performancne
+    T.no_grad()
 
+    #Create simulator
+    sim, state = create_simulator(map_id, map_direction)
+    
+    #Saving episode trajectories
+    states = []
+    actions = []
+    rewards = []
 
-#Game specific state
-running = True
-winners = None
+    #Game completion state
+    done = False
 
-#Game loop
-while running:
-    if winners is not None:
-        ##############################################################################################
-        #DO SOMETHING WHEN WINNER HAS BEEN FOUND
-        ##############################################################################################
-        print(winners)
+    #Play episode till completion
+    while not done:
+        #Get next action
+        action = agent.action(state)
 
-        #Reset simulation
-        winners = None
-        #Create agents, controllers, and simulation
-        agents = create_agents()
-        controllers = create_controllers()
-        sim = create_simulation(agents, controllers)
-
-
-    #Simulate time step
-    losers = sim.update(r.randint(*time_step_range))
+        #Save state and action
+        states.append(state)
+        actions.append(action)
 
 
-    #Get indexes of agents alive
-    alive_indexes = np.array(list(sim.alive_agents.keys()))
-    #If all alive agents are of the same team, mark winner
-    if np.all(alive_indexes < team_size) or np.all(alive_indexes >= team_size):
-        winners = alive_indexes
+        #Simulate time step
+        state, reward, done = sim.step(time_step, action)
+
+        #Save rewards
+        rewards.append(reward)
+
+    #Return simulation results
+    return states, actions, rewards
+
+
+def simulate_maps(agent, map_sequence):
+    #Create simulation arguments for each map
+    arguments = [[agent, map_id, map_direction] for map_id, map_direction in map_sequence]
+
+    #Start simulations
+    with ProcessPoolExecutor(processes_maps) as executor:
+        return executor.map(simulate_map_caller, arguments)
+
+
+def train_agent_caller(params):
+    return train_agent(*params)
+
+def train_agent(policy, map_sequence):
+    #Create agent to play game
+    agent = create_agent(policy)
+
+    #Create map sequence
+    map_data = list(zip(*map_sequence))
+
+
+    #Train agent for i training iterations with 'data' steps each time
+    for i in range(0, epoch_training_iterations * epoch_training_data, epoch_training_data):
+        #Disable gradients for performancne
+        T.no_grad()
+
+        #Simulate subset of map sequence with agent
+        map_results = simulate_maps(agent, map_data[i:i + epoch_training_data])
+
+
+        #Save results
+        for states, actions, rewards in map_results:
+            #Save episode
+            agent.save_episode(states, actions, rewards)
+
+
+        #Reenable gradients for training
+        T.enable_grad()
+
+        #Train agent
+        agent.train()
+
+
+
+    #Simulate evaluation subset of maps
+    map_results = list(simulate_maps(agent, map_data[epoch_training_iterations * epoch_training_data:]))
+    
+    #Calculate mean episode summed reward
+    episode_rewards = 0
+    for _, _, rewards in map_results:
+        episode_rewards += np.array(rewards).sum()
+
+    episode_rewards = episode_rewards / len(map_results)
+
+
+    #Print makeshift progress bar 
+    print('=', end='', flush=True)
+
+    #Return trained policy, and mean episode reward
+    return policy, episode_rewards
+
+
+def train():
+    #Create simulation counters
+    #If resuming, continue simulation
+    if os.path.isfile(state_path):
+        with open(state_path, 'r') as file:
+            epoch_counter = int(file.readline())
+            last_save_point = int(file.readline())
+
+        #Load simulation data file
+        plot_file = CsvManager([plot_x_axis, plot_y_axis], file_name=plot_data_path, clear=False)
+
+    #Else, start simulation from nothing
+    else:
+        shutil.rmtree(policy_folder, ignore_errors=True)
+        os.mkdir(policy_folder)
+
+        shutil.rmtree(plot_data_folder, ignore_errors=True)
+        os.mkdir(plot_data_folder)
+
+        epoch_counter = 0
+        last_save_point = 0
+
+        #Create simulation data file
+        plot_file = CsvManager([plot_x_axis, plot_y_axis], file_name=plot_data_path, clear=True)
+
+
+    #Store elite policies
+    elites = create_policies()
+
+
+    #Training loop
+    while epoch_counter < max_generations:
+        #Simulate episodes in parallel
+        print("SIMULATING ", end='', flush=True)
+
+        #Generate map sequence
+        map_sequence = create_map_sequence()
+
+        #Make arguments for each simulation
+        arguments = []
+        for policy in elites:
+            for _ in range(epoch_offspring_per_elite):
+                arguments.append([copy.deepcopy(policy), map_sequence])
+
+        #Start simulations
+        with ProcessPoolExecutor(processes_agents) as executor:
+            simulation_batches = executor.map(train_agent_caller, arguments)
+            simulation_batches = list(simulation_batches)
+
+
+        #Merge episode data
+        print("> PROCESSING RESULTS", flush=True)
+
+        #Sort simulations by elites first
+        simulation_batches.sort(key=lambda b: b[1], reverse=True)
+
+        #Store elites
+        elites = [e for e, _ in simulation_batches[:epoch_elite]]
+
+        #Update game counter
+        epoch_counter += 1
+
+
+        #Print and save best mean reward
+        best_mean_reward = simulation_batches[0][1]
+
+        print(f"{epoch_counter}: {best_mean_reward}", end='', flush=True)
+        plot_file.save_data([epoch_counter, best_mean_reward])
+
+
+        #Save snapshot of elites
+        for i, policy in enumerate(elites):
+            T.save(policy, policy_path.format(i))
+
+
+        #If save checkpoint reached, store frozen snapshot of current elites
+        if epoch_counter - last_save_point >= epochs_per_freeze_snapshot:
+            #Reset save checkpoint counter
+            last_save_point = epoch_counter
+            
+            #Prepare timestamp string
+            timestamp = datetime.utcnow().isoformat().replace(':', '-')
+            
+            #Save snapshot of elites
+            freeze_folder = freeze_snapshot_folder.format(timestamp, epoch_counter)
+            os.mkdir(freeze_folder)
+            for i, (policy, mean_reward) in enumerate(simulation_batches[:epoch_elite]):
+                T.save(policy, freeze_folder + freeze_snapshot_file.format(i, mean_reward))
+
+
+        with open(state_path, 'w') as file:
+            file.writelines([f"{epoch_counter}\n", f"{last_save_point}\n"])
+
+
+        #Print finish status message
+        print(" ==> SAVED", end="\n\n", flush=True)
+
+
+
+if __name__ == '__main__':
+    train()

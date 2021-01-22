@@ -1,173 +1,123 @@
-from ai.idle import create_idle_controller
-from ai.spinbot import create_spinbot_controller
-from ai.seeker import create_seeker_controller
-from ai.predictive_seeker import create_predictive_seeker_controller
-import math
 import pygame as pg
 import numpy as np
-from time import sleep
+import random as r
+import math
+import time
+import os
+os.environ['KMP_DUPLICATE_LIB_OK']='True'
+import torch as T
 
-from environment.agent import Agent
-from environment.simulator import Simulator
-from environment.map import create_empty_map, create_middle_obstacle, create_spawns
-from game.keyboard_controller import create_keyboard_controller, wasd_control_scheme, uhjk_control_scheme
-from game.drawers import draw_bullet, draw_agent, draw_kill_zone
+from game.keyboard_controller import create_keyboard_controller, wasd_control_scheme, dvorak_wasd_control_scheme
+from game.drawers import draw_game
+from setup import create_policies, create_policy, create_simulator, create_agent, map_size, time_step, randomize_map
 
 
-#Define distances
-map_size = (1600, 900)
-agent_start_edge_distance = 200
-agent_size = np.array([50, 20])
-agent_spawns = create_spawns(*map_size, agent_start_edge_distance)
 
-#Initialize pygame
+
+#Define parameters
+running = True
+restart = False
+
+zoomed = True
+zoom_in_scale = 8.0
+zoom_out_scale = 1.0
+zoom_scale_target = zoom_in_scale
+zoom_scale = zoom_out_scale
+zoom_pos_target = None #Defaults to car
+zoom_pos = map_size / 2
+zoom_scale_speed = 0.02
+zoom_pos_speed = 0.02
+zoom_pos_vel_factor = 3000
+zoom_scale_vel_factor = -70
+
+
 pg.init()
-window = pg.display.set_mode(map_size)
+window = pg.display.set_mode(tuple(map_size))
 clock = pg.time.Clock()
-font = pg.font.SysFont(None, 48)
 
+game_counter = 0
+time_delta = time_step
 pg_events = None
 
 
-#Define simulation parameters
-agent_colors = [
-    (0, 127, 255),
-    (0, 127, 255),
-    (255, 127, 0),
-    (255, 127, 0),
-]
+#Create simulation
+sim, state = create_simulator()
+#Load best agent
+agent = create_agent(create_policy(0))
 
-map = create_empty_map(*map_size)
-wall = create_middle_obstacle(*map_size)
+# controller = create_keyboard_controller(lambda: pg_events, wasd_control_scheme)
+# controller = create_keyboard_controller(lambda: pg_events, dvorak_wasd_control_scheme)
 
 
-#Helper function to create agents at specific positions and orientations
-def create_agents():
-    return [
-        Agent(*agent_spawns[0],
-              agent_size),
-        Agent(*agent_spawns[1],
-              agent_size),
-        Agent(*agent_spawns[3],
-              agent_size),
-        Agent(*agent_spawns[4],
-              agent_size),
-    ]
+#Helper functions to tidy up things
+def handle_events():
+    global randomize_map
+    global time_delta
+    global pg_events
+    global running
+    global restart
+    global zoomed
+    global zoom_scale
+    global zoom_pos
+    
+    #Set zoom
+    zoom_pos_target = sim.car.position + sim.car.velocity * zoom_pos_vel_factor if zoomed else map_size / 2
+    zoom_scale_target = zoom_in_scale + np.linalg.norm(sim.car.velocity) * zoom_scale_vel_factor if zoomed else zoom_out_scale
 
-#Helper function to create controllers for agents
-def create_controllers():
-    return [
-        ##############################################################################################
-        #Choose controllers
-        # - Keyboard controlled agent
-        # - Idle AI agent
-        # - Spinbot AI agent
-        # - Seeker AI agent
-        # - Predictive seeker AI agent
-        ##############################################################################################
-
-        # create_keyboard_controller(lambda: pg_events, wasd_control_scheme),
-        # create_keyboard_controller(lambda: pg_events, uhjk_control_scheme)
-        # create_idle_controller(),
-        # create_spinbot_controller(),
-        # create_seeker_controller(),
-        create_seeker_controller(enemy_ids=range(2, 4)),
-        create_seeker_controller(enemy_ids=range(2, 4)),
-        create_predictive_seeker_controller(enemy_ids=range(0, 2)),
-        create_predictive_seeker_controller(enemy_ids=range(0, 2)),
-    ]
-
-#Helper function to create simulation with required parameters
-def create_simulation(agents, controllers):
-    return Simulator(agents, controllers, [*map, wall])
-
-
-#Create agents, controllers, and simulation
-agents = create_agents()
-controllers = create_controllers()
-sim = create_simulation(agents, controllers)
-
-#NOTE: Uneven teams biases second team
-team_size = len(agents) // 2
-
-
-#Game specific state
-running = True
-winners = None
-
-#Game loop
-while running:
-    if winners is not None:
-        #Prepare end text
-        if len(winners) > 0:
-            player_text = f"Player{'s' if len(winners)>1 else ''}"
-            end_text = font.render(f"{player_text} {' and '.join([str(w+1) for w in winners])} won!", 
-                                   True, #Antialiasing
-                                   agent_colors[winners[0]]) #Color
-        else:
-            end_text = font.render(f"Draw!", True, (128, 128, 128))
-
-        #Draw end text horizontally centered at top of screen
-        (w, h) = map_size
-        window.blit(end_text, ((w-end_text.get_rect().width)//2, h//10))
-
-        #Render to window
-        pg.display.update()
-
-
-        #Reset simulation
-        winners = None
-        #Create agents, controllers, and simulation
-        agents = create_agents()
-        controllers = create_controllers()
-        sim = create_simulation(agents, controllers)
-
-
-        #Pause game
-        #NOTE: Disgusting, I know, performance is not important here
-        sleep(3)
-
-        #Reset game clock
-        clock = pg.time.Clock()
+    zoom_scale += (zoom_scale_target - zoom_scale) * zoom_scale_speed
+    zoom_pos += (zoom_pos_target - zoom_pos) * zoom_pos_speed
 
 
     #Get time and events
-    time_delta = clock.tick()
+    time_delta = time_step if time_step else clock.tick()
     pg_events = pg.event.get()
 
     #Handle events
     for e in pg_events:
         if e.type == pg.QUIT:
             running = False
+        if e.type == pg.KEYDOWN:
+            if e.key == pg.K_m:
+                randomize_map = not randomize_map
+            if e.key == pg.K_z:
+                zoomed = not zoomed
+            if e.key == pg.K_r:
+                restart = True
+                    
 
+def zoomer(points):
+    return ((points - zoom_pos) * zoom_scale + map_size / 2).astype(np.int)
+
+
+#Game loop
+while running:
+    #Handle game events
+    handle_events()
+    
+
+    #Get next action
+    action = agent.action(state)
+    # action = controller()
 
     #Simulate time step
-    sim.update(time_delta)
+    state, reward, done = sim.step(time_delta, action)
 
+    #Draw simulator environment
+    draw_game(window, sim, state, zoomer)
 
-    #Get indexes of agents alive
-    alive_indexes = np.array(list(sim.alive_agents.keys()))
-    #If all alive agents are of the same team, mark winner
-    if np.all(alive_indexes < team_size) or np.all(alive_indexes >= team_size):
-        winners = alive_indexes
-    #Else, continue drawing game
-    else:
-        #Draw background
-        window.fill((255, 255, 255))
-
-        #Draw kill zones
-        for zone in sim.kill_zones:
-            draw_kill_zone(window, zone)
-
-        #Draw bullets
-        for bullet in sim.bullets:
-            draw_bullet(window, bullet)
-
-        #Draw alive agents
-        for agent_id, agent in sim.alive_agents.items():
-            color = agent_colors[agent_id]
-            draw_agent(window, agent, color)
-
-
-    #Update window
-    pg.display.update()
+    #If agent won/lost, renew agent and reset rendered environment
+    if done or restart:
+        #Retrieve agent from file again in case of updates
+        #NOTE: If failed to load agent from file, tries again.
+        # Can happen if file is being updated.
+        while True:
+            try:
+                agent = create_agent(create_policy(0))
+                break
+            except:
+                print("Failed while loading agent")
+                time.sleep(1.6)
+                continue
+        restart = False
+        #Reset environment
+        state = sim.reset() if randomize_map else sim.reset(sim.map_id, sim.map_direction)

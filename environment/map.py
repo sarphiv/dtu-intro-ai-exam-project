@@ -1,55 +1,52 @@
 import numpy as np
 import math
 
-def create_spawns(map_width, map_height, spawn_edge_distance):
-    return [
-        #Top left corner
-        (np.array([spawn_edge_distance, spawn_edge_distance]),
-        math.pi / 4 * -1),
-        #Bottom left corner
-        (np.array([spawn_edge_distance, map_height - spawn_edge_distance]),
-        math.pi / 4 * 1),
+map_path = "maps.npy"
+map_global_scale = 0.9
+maps = np.load(map_path, allow_pickle=True)
+map_amount = maps.shape[0]
 
-        #Left side, middle of map
-        (np.array([spawn_edge_distance, map_height / 2]),
-        math.pi * 0),
+def get_min_max(map):
+    #Get x,y-coordinates
+    map_coords = map.reshape((-1, 2))
 
-
-        #Top right corner
-        (np.array([map_width - spawn_edge_distance, spawn_edge_distance]),
-        math.pi / 4 * -3),
-        #Bottom right corner
-        (np.array([map_width - spawn_edge_distance, map_height - spawn_edge_distance]),
-        math.pi / 4 * 3),
-        
-        #Right side, middle of map
-        (np.array([map_width - spawn_edge_distance, map_height / 2]),
-        math.pi * 1)
-    ]
+    #Get minimum x,y coordinates
+    return np.min(map_coords, axis=0), np.max(map_coords, axis=0)
 
 
-def create_empty_map(width, height):
-    (w, h) = (width, height)
-    edge_depth = max(w, h) / 4
-    edge_right = [(0, 0), (-edge_depth, 0), (-edge_depth, h), (0, h)]
-    edge_left = [(w, 0), (w+edge_depth, 0), (w+edge_depth, h), (w, h)]
-    edge_top = [(0, 0), (0, -edge_depth), (w, -edge_depth), (w, 0)]
-    edge_bottom = [(0, h), (0, h+edge_depth), (w, h+edge_depth), (w, h)]
+def get_map(id, direction, width, height):
+    #Retrieve map from cache
+    map = maps[id]
+    map = np.array([map[0], map[1]])[:, ::-1 if direction else 1]
+
+    #Get smallest dimension of playground
+    if width < height:
+        map_coords_index = 0
+        map_scaler = width
+    else:
+        map_coords_index = 1
+        map_scaler = height
+
+
+    #Get map limits
+    (map_min, map_max) = get_min_max(map)
+    min = map_min[map_coords_index]
+    max = map_max[map_coords_index]
     
-    return [edge_right, edge_left, edge_top, edge_bottom]
-
-
-def create_middle_obstacle(map_width, map_height):
-    x_scale = 0.05
-    y_scale = 0.05
+    #Normalize map
+    nrm_map = (map - min) / (max - min)
+    #Scale map
+    scaled_map = nrm_map * map_scaler * map_global_scale
     
-    width = x_scale * map_width
-    height = y_scale * map_height
+    #Get scaled map limits
+    (map_min, map_max) = get_min_max(scaled_map)
     
-    top_left     = np.array([(map_width - width) / 2, (map_height - height) / 2])
-    bottom_right = top_left + np.array([width, height])
+    #Calculate centering offset
+    map_offset = np.array([width, height]) / 2
+    map_offset += -map_min - (map_max - map_min) / 2
     
-    (x1, y1) = top_left
-    (x2, y2) = bottom_right
+    #Offset map
+    scaled_map += map_offset.reshape(1, 1, 2)
 
-    return [(x1, y1), (x1+width/2, y1-height/2), (x2, y1), (x2, y2),(x2-width/2, y2+height/2), (x1, y2)]
+    #Return map
+    return scaled_map
