@@ -31,7 +31,7 @@ class plot_manager():
         self.ax.set_xlabel(labels[0])
         self.ax.set_ylabel(labels[1])
         #plt.legend(loc='upper left')
-        plt.legend(loc="lower right")
+        #plt.legend(loc="lower right")
         
         # Show figure 
         plt.pause(0.00000001)
